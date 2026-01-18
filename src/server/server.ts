@@ -5,9 +5,9 @@
  * 基于 Socket.IO 实现 WebRTC 信令服务器，用于 WebRTC 连接建立和协商
  */
 
+import { createLogger } from "@dreamer/logger";
 import type { SocketIOSocket } from "@dreamer/socket-io";
 import { Server as SocketIOServer } from "@dreamer/socket-io";
-import { createLogger } from "@dreamer/logger";
 import type {
   ICEServer,
   RoomInfo,
@@ -38,7 +38,7 @@ export class SignalingServer {
   /** 日志器实例 */
   private logger = createLogger({
     level: "info",
-    prefix: "[SignalingServer]",
+    context: { module: "SignalingServer" },
   });
   /** 房间映射（roomId -> RoomInfo） */
   private rooms: Map<string, RoomInfo> = new Map();
@@ -129,7 +129,7 @@ export class SignalingServer {
    */
   private setupConnectionHandlers(): void {
     this.io.on("connection", (socket: SocketIOSocket) => {
-      this.logger.info(`新连接: ${socket.id}`);
+      this.logger.info(`[SignalingServer] 新连接: ${socket.id}`);
 
       // 处理加入房间
       socket.on(
@@ -216,7 +216,9 @@ export class SignalingServer {
     // 将 Socket 加入房间（Socket.IO 房间功能）
     socket.join(roomId);
 
-    this.logger.info(`用户 ${actualUserId} 加入房间 ${roomId}`);
+    this.logger.info(
+      `[SignalingServer] 用户 ${actualUserId} 加入房间 ${roomId}`,
+    );
 
     // 通知房间内其他用户（使用 socket.to() 方法）
     socket.to(roomId).emit("user-joined", {
@@ -282,7 +284,7 @@ export class SignalingServer {
     // 清理用户到 Socket 的映射
     this.userToSocket.delete(userId);
 
-    this.logger.info(`用户 ${userId} 离开房间 ${roomId}`);
+    this.logger.info(`[SignalingServer] 用户 ${userId} 离开房间 ${roomId}`);
   }
 
   /**
@@ -532,7 +534,7 @@ export class SignalingServer {
     const userId = this.socketToUser.get(socket.id);
     if (!userId) return;
 
-    this.logger.info(`用户 ${userId} 断开连接: ${reason}`);
+    this.logger.info(`[SignalingServer] 用户 ${userId} 断开连接: ${reason}`);
 
     // 处理离开房间
     this.handleLeaveRoom(socket);
@@ -557,7 +559,9 @@ export class SignalingServer {
   async listen(): Promise<void> {
     await this.io.listen();
     this.logger.info(
-      `信令服务器已启动，监听端口 ${this.io.options.port || 3000}`,
+      `[SignalingServer] 信令服务器已启动，监听端口 ${
+        this.io.options.port || 3000
+      }`,
     );
   }
 
@@ -581,7 +585,7 @@ export class SignalingServer {
     this.messageQueue.clear();
 
     await this.io.close();
-    this.logger.info("信令服务器已关闭");
+    this.logger.info("[SignalingServer] 信令服务器已关闭");
   }
 
   /**
