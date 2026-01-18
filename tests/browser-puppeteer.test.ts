@@ -1,1405 +1,931 @@
 /**
- * @fileoverview 使用 Puppeteer 进行浏览器端测试（兼容 Deno 和 Bun）
- * 需要安装: deno add npm:puppeteer 或 bun add puppeteer
+ * @fileoverview 使用 @dreamer/test 浏览器测试集成进行浏览器端测试
+ * 使用新版测试库的浏览器测试功能，自动管理 Puppeteer 和 esbuild
  */
 
+import { RUNTIME } from "@dreamer/runtime-adapter";
 import {
-  detectRuntime,
-  existsSync,
-  makeTempFile,
-  removeSync,
-  resolve,
-  RUNTIME,
-  statSync,
-  writeTextFileSync,
-} from "@dreamer/runtime-adapter";
-import { afterEach, beforeEach, describe, expect, it } from "@dreamer/test";
-import * as esbuild from "esbuild";
-import puppeteer from "puppeteer";
+  afterAll,
+  beforeAll,
+  describe,
+  expect,
+  it,
+} from "@dreamer/test";
 import { SignalingServer } from "../src/server/mod.ts";
-import { delay, getAvailablePort, waitForServerReady } from "./test-utils.ts";
+import {
+  delay,
+  getAvailablePort,
+  waitForPortRelease,
+  waitForServerReady,
+} from "./test-utils.ts";
 
-describe(`WebRTC - Puppeteer 浏览器测试 (${RUNTIME})`, () => {
-  let browser: any = null;
-  let page: any = null;
-  let server: SignalingServer | null = null;
-  let testPort: number;
-  let serverUrl: string;
-  let buildTimer: ReturnType<typeof setTimeout> | null = null;
-  let waitTimer: ReturnType<typeof setTimeout> | null = null;
+// 服务器相关变量
+let server: SignalingServer | null = null;
+let testPort: number;
+let serverUrl: string;
 
-  // 跳过测试的辅助函数（如果 Puppeteer 不可用）
-  const skipIfNoBrowser = (testFn: () => void | Promise<void>) => {
-    return async () => {
-      if (!page) {
-        console.warn(`[${RUNTIME}] 跳过测试：浏览器未初始化`);
-        return;
-      }
-      await testFn();
-    };
-  };
-
-  beforeEach(async () => {
-    try {
-      // 启动信令服务器
-      testPort = getAvailablePort();
-      serverUrl = `http://localhost:${testPort}`;
-      server = new SignalingServer({
-        port: testPort,
-        stunServers: [{ urls: "stun:stun.l.google.com:19302" }],
-      });
-      await server.listen();
-      await waitForServerReady(serverUrl);
-
-      // 使用 runtime-adapter 检测运行时
-      const runtime = detectRuntime();
-      console.log(`[${runtime}] 初始化 Puppeteer 测试环境`);
-
-      // 尝试使用系统 Chrome（如果可用）
-      let executablePath: string | undefined;
-
-      // macOS Chrome 路径
-      const macChromePaths = [
-        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-        "/Applications/Chromium.app/Contents/MacOS/Chromium",
-      ];
-
-      // Linux Chrome 路径
-      const linuxChromePaths = [
-        "/usr/bin/google-chrome",
-        "/usr/bin/chromium",
-        "/usr/bin/chromium-browser",
-      ];
-
-      // Windows Chrome 路径
-      const windowsChromePaths = [
-        "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
-        "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
-      ];
-
-      // 使用 runtime-adapter 的文件系统 API 检查系统 Chrome
-      const allPaths = [
-        ...macChromePaths,
-        ...linuxChromePaths,
-        ...windowsChromePaths,
-      ];
-      for (const path of allPaths) {
-        try {
-          if (existsSync(path)) {
-            const stat = statSync(path);
-            if (stat.isFile) {
-              executablePath = path;
-              console.log(`[${runtime}] 找到 Chrome: ${path}`);
-              break;
-            }
-          }
-        } catch {
-          // 继续检查下一个路径
-        }
-      }
-
-      browser = await puppeteer.launch({
-        headless: true,
-        executablePath,
-        args: [
-          "--no-sandbox",
-          "--disable-setuid-sandbox",
-          "--disable-dev-shm-usage",
-          "--disable-gpu",
-          "--use-fake-ui-for-media-stream", // 允许自动授予媒体权限
-          "--use-fake-device-for-media-stream", // 使用假设备（测试环境）
-        ],
-      });
-      page = await browser.newPage();
-
-      // 使用 esbuild 构建 WebRTC Client 代码
-      let bundledCode = "";
-      try {
-        const runtime = detectRuntime();
-        console.log(`[${runtime}] 开始构建 WebRTC Client bundle...`);
-
-        // 创建临时入口文件
-        const tempEntry = await makeTempFile({
-          prefix: "webrtc-client-test-",
-          suffix: ".ts",
-        });
-
-        // 获取项目根目录和模块路径
-        const projectRoot = await resolve("./");
-        const clientModPath = await resolve("./src/client/mod.ts");
-
-        // 写入入口文件代码
-        const entryCode = `// 测试入口文件
-import { RTCClient } from '${clientModPath}';
-
-// 导出到全局
-if (typeof window !== 'undefined') {
-  (window as any).RTCClient = RTCClient;
-  (window as any).webrtcReady = true;
-}
-`;
-        writeTextFileSync(tempEntry, entryCode);
-
-        // 使用 esbuild 构建
-        const buildResult = await esbuild.build({
-          entryPoints: [tempEntry],
-          bundle: true,
-          format: "iife",
-          platform: "browser",
-          target: "es2020",
-          minify: false,
-          sourcemap: false,
-          write: false, // 不写入文件，只返回结果
-          treeShaking: true,
-          // 将 npm 依赖标记为 external（在浏览器中通过 CDN 或全局变量提供）
-          external: [],
-          // 定义全局变量
-          define: {
-            "process.env.NODE_ENV": '"production"',
-          },
-          // 全局名称（IIFE 格式需要）
-          globalName: "WebRTCClientBundle",
-          // 设置工作目录
-          absWorkingDir: projectRoot,
-        });
-
-        // 获取生成的代码
-        if (buildResult.outputFiles && buildResult.outputFiles.length > 0) {
-          bundledCode = new TextDecoder().decode(
-            buildResult.outputFiles[0].contents,
-          );
-          console.log(
-            `[${runtime}] Bundle 构建成功，大小: ${bundledCode.length} 字节`,
-          );
-        } else {
-          throw new Error("构建失败：没有生成输出文件");
-        }
-
-        // 清理临时文件
-        try {
-          removeSync(tempEntry);
-        } catch {
-          // 忽略清理错误
-        }
-
-        // 清理 esbuild 资源
-        try {
-          if (esbuild) {
-            await esbuild.stop();
-          }
-        } catch {
-          // 忽略停止错误
-        }
-      } catch (buildError) {
-        const runtime = detectRuntime();
-        console.warn(
-          `[${runtime}] Bundle 构建失败，使用模拟实现:`,
-          buildError instanceof Error ? buildError.message : String(buildError),
-        );
-
-        // 如果构建失败，使用模拟实现
-        bundledCode = `
-// 模拟 RTCClient（构建失败时的降级方案）
-window.RTCClient = class {
-  constructor(options) {
-    this.options = options;
-    this.connectionState = 'new';
-    this.iceConnectionState = 'new';
-  }
-  connect() { this.connectionState = 'connecting'; }
-  disconnect() { this.connectionState = 'disconnected'; }
-  async getUserMedia() { return new MediaStream(); }
-  async getDisplayMedia() { return new MediaStream(); }
-  on() { return this; }
-  off() { return this; }
-  emit() { return this; }
+// 浏览器测试配置
+const browserConfig = {
+  // 禁用资源泄漏检查（浏览器测试可能有内部定时器）
+  sanitizeOps: false,
+  sanitizeResources: false,
+  // 启用浏览器测试
+  browser: {
+    enabled: true,
+    // 客户端代码入口
+    entryPoint: "./src/client/mod.ts",
+    // 全局变量名
+    globalName: "WebRTCClient",
+    // 无头模式
+    headless: true,
+    // Chrome 启动参数（支持 WebRTC 测试）
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-gpu",
+      "--use-fake-ui-for-media-stream",
+      "--use-fake-device-for-media-stream",
+    ],
+    // 复用浏览器实例
+    reuseBrowser: true,
+    // 自定义 body 内容
+    bodyContent: `
+      <div id="test-container">
+        <video id="local-video" autoplay muted></video>
+        <video id="remote-video" autoplay></video>
+      </div>
+    `,
+  },
 };
-window.webrtcReady = true;
-`;
-      }
 
-      // 读取测试 HTML 页面
-      const testPagePath = await resolve(
-        "./tests/data/fixtures/test-page.html",
-      );
-      let testPageHtml = "";
-      try {
-        const { readTextFileSync } = await import("@dreamer/runtime-adapter");
-        testPageHtml = readTextFileSync(testPagePath);
-      } catch {
-        // 如果读取失败，使用内联 HTML
-        testPageHtml = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <title>WebRTC Test</title>
-</head>
-<body>
-  <div id="test-container">
-    <video id="local-video" autoplay muted></video>
-    <video id="remote-video" autoplay></video>
-  </div>
-  <script>${bundledCode}</script>
-</body>
-</html>`;
-      }
-
-      // 将构建的代码注入到 HTML 中
-      testPageHtml = testPageHtml.replace(
-        /<script type="module">[\s\S]*?<\/script>/,
-        `<script>${bundledCode}</script>`,
-      );
-
-      // 设置页面内容
-      await page.setContent(testPageHtml, { waitUntil: "networkidle0" });
-
-      // 等待客户端准备好
-      await page.waitForFunction(
-        () => (window as any).webrtcReady === true,
-        { timeout: 5000 },
-      ).catch(() => {
-        // 如果等待超时，继续执行（可能是模拟实现）
-      });
-    } catch (_error) {
-      const runtime = detectRuntime();
-      console.error(`[${runtime}] 初始化失败:`, _error);
-      throw _error;
-    }
+describe(`WebRTC - 浏览器测试 (${RUNTIME})`, () => {
+  // 在所有测试前启动信令服务器
+  beforeAll(async () => {
+    testPort = getAvailablePort();
+    serverUrl = `http://localhost:${testPort}`;
+    server = new SignalingServer({
+      port: testPort,
+      stunServers: [{ urls: "stun:stun.l.google.com:19302" }],
+    });
+    await server.listen();
+    await waitForServerReady(serverUrl);
+    console.log(`[${RUNTIME}] 信令服务器已启动: ${serverUrl}`);
   });
 
-  afterEach(async () => {
-    // 清理定时器
-    if (buildTimer) {
-      clearTimeout(buildTimer);
-      buildTimer = null;
+  // 在所有测试后关闭信令服务器
+  afterAll(async () => {
+    if (server) {
+      await server.close();
+      // 等待端口完全释放，确保后续测试可以正常启动
+      await waitForPortRelease(testPort);
+      server = null;
+      console.log(`[${RUNTIME}] 信令服务器已关闭`);
     }
-    if (waitTimer) {
-      clearTimeout(waitTimer);
-      waitTimer = null;
-    }
-
-    // 关闭页面和浏览器
-    try {
-      if (page) {
-        await page.close().catch(() => {
-          // 忽略关闭页面的错误
-        });
-        page = null;
-      }
-      if (browser) {
-        // 获取所有打开的页面并关闭
-        const pages = await browser.pages().catch(() => []);
-        await Promise.all(
-          pages.map((p: any) => p.close().catch(() => {})),
-        );
-
-        // 关闭浏览器（这会自动关闭所有子进程）
-        await browser.close().catch(() => {
-          // 忽略连接已关闭的错误
-        });
-        browser = null;
-      }
-    } catch (_error) {
-      // 忽略清理错误
-    }
-
-    // 关闭服务器
-    try {
-      if (server) {
-        await server.close();
-        await delay(200);
-        server = null;
-      }
-    } catch (_error) {
-      // 忽略关闭服务器的错误
-    }
-
-    // 清理 esbuild 资源
-    try {
-      if (esbuild) {
-        await esbuild.stop();
-      }
-    } catch {
-      // 忽略停止错误（esbuild 可能已经停止）
-    }
-
-    // 强制等待一小段时间，确保资源释放
-    await new Promise((resolve) => setTimeout(resolve, 50));
   });
 
   describe("RTCClient 浏览器环境测试", () => {
-    it(
-      "应该在浏览器中创建 RTCClient 实例",
-      skipIfNoBrowser(async () => {
-        // 使用字符串形式的代码，避免 TypeScript 类型检查问题
-        const result = await page.evaluate((url: string) => {
-          // @ts-ignore - 浏览器环境中的全局变量
-          if (typeof globalThis.RTCClient === "undefined") {
-            return { success: false, error: "RTCClient 未定义" };
+    it("应该在浏览器中创建 RTCClient 实例", async (t) => {
+      // @ts-ignore - 浏览器测试上下文
+      const result = await t.browser!.evaluate(() => {
+        // 检查 RTCClient 是否已加载
+        const win = globalThis as any;
+        if (typeof win.WebRTCClient === "undefined") {
+          return { success: false, error: "WebRTCClient 未定义" };
+        }
+
+        try {
+          // 创建 RTCClient 实例
+          const client = new win.WebRTCClient.RTCClient({
+            signalingUrl: "http://localhost:30000",
+            autoConnect: false,
+          });
+
+          return {
+            success: true,
+            hasConnect: typeof client.connect === "function",
+            hasDisconnect: typeof client.disconnect === "function",
+            hasGetUserMedia: typeof client.getUserMedia === "function",
+            hasGetDisplayMedia: typeof client.getDisplayMedia === "function",
+          };
+        } catch (error: any) {
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : String(error),
+          };
+        }
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.hasConnect).toBe(true);
+      expect(result.hasDisconnect).toBe(true);
+      expect(result.hasGetUserMedia).toBe(true);
+      expect(result.hasGetDisplayMedia).toBe(true);
+    }, browserConfig);
+
+    it("应该支持 RTCPeerConnection API", async (t) => {
+      // @ts-ignore - 浏览器测试上下文
+      const result = await t.browser!.evaluate(() => {
+        try {
+          const win = globalThis as any;
+
+          // 检查全局和 window 对象
+          const hasRTCPeerConnection =
+            typeof win.RTCPeerConnection !== "undefined";
+
+          const hasMediaStream = typeof win.MediaStream !== "undefined";
+
+          const hasGetUserMedia =
+            typeof navigator !== "undefined" &&
+            typeof (navigator as any).mediaDevices !== "undefined" &&
+            typeof (navigator as any).mediaDevices.getUserMedia === "function";
+
+          return {
+            hasRTCPeerConnection,
+            hasMediaStream,
+            hasGetUserMedia,
+          };
+        } catch (_error) {
+          return {
+            hasRTCPeerConnection: false,
+            hasMediaStream: false,
+            hasGetUserMedia: false,
+          };
+        }
+      });
+
+      expect(result.hasRTCPeerConnection).toBe(true);
+      expect(result.hasMediaStream).toBe(true);
+    }, browserConfig);
+
+    it("应该支持创建 RTCPeerConnection 实例", async (t) => {
+      // @ts-ignore - 浏览器测试上下文
+      const result = await t.browser!.evaluate(() => {
+        try {
+          const win = globalThis as any;
+          const pc = new win.RTCPeerConnection({
+            iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+          });
+          const isValid = pc instanceof win.RTCPeerConnection;
+          pc.close();
+          return { success: true, isValid };
+        } catch (error: any) {
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : String(error),
+          };
+        }
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.isValid).toBe(true);
+    }, browserConfig);
+
+    it("应该支持事件监听", async (t) => {
+      // @ts-ignore - 浏览器测试上下文
+      const result = await t.browser!.evaluate(() => {
+        const win = globalThis as any;
+        if (typeof win.WebRTCClient === "undefined") {
+          return { success: false, error: "WebRTCClient 未定义" };
+        }
+
+        try {
+          const client = new win.WebRTCClient.RTCClient({
+            signalingUrl: "http://localhost:30000",
+            autoConnect: false,
+          });
+
+          let _eventFired = false;
+          client.on("connection-state-change", () => {
+            _eventFired = true;
+          });
+
+          client.connect();
+
+          return {
+            success: true,
+            hasOn: typeof client.on === "function",
+            hasOff: typeof client.off === "function",
+          };
+        } catch (error: any) {
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : String(error),
+          };
+        }
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.hasOn).toBe(true);
+      expect(result.hasOff).toBe(true);
+    }, browserConfig);
+
+    it("应该支持连接状态管理", async (t) => {
+      // @ts-ignore - 浏览器测试上下文
+      const result = await t.browser!.evaluate(() => {
+        const win = globalThis as any;
+        if (typeof win.WebRTCClient === "undefined") {
+          return { success: false, error: "WebRTCClient 未定义" };
+        }
+
+        try {
+          const client = new win.WebRTCClient.RTCClient({
+            signalingUrl: "http://localhost:30000",
+            autoConnect: false,
+          });
+
+          const initialState = client.getConnectionState
+            ? client.getConnectionState()
+            : client.connectionState;
+          client.connect();
+          const connectingState = client.getConnectionState
+            ? client.getConnectionState()
+            : client.connectionState;
+          client.disconnect();
+          const disconnectedState = client.getConnectionState
+            ? client.getConnectionState()
+            : client.connectionState;
+
+          return {
+            success: true,
+            initialState,
+            connectingState,
+            disconnectedState,
+          };
+        } catch (error: any) {
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : String(error),
+          };
+        }
+      });
+
+      expect(result.success).toBe(true);
+      expect(typeof result.initialState).toBe("string");
+      expect(typeof result.connectingState).toBe("string");
+      expect(typeof result.disconnectedState).toBe("string");
+    }, browserConfig);
+
+    it("应该支持断开连接", async (t) => {
+      // @ts-ignore - 浏览器测试上下文
+      const result = await t.browser!.evaluate(() => {
+        const win = globalThis as any;
+        if (typeof win.WebRTCClient === "undefined") {
+          return { success: false, error: "WebRTCClient 未定义" };
+        }
+
+        try {
+          const client = new win.WebRTCClient.RTCClient({
+            signalingUrl: "http://localhost:30000",
+            autoConnect: false,
+          });
+
+          client.connect();
+          const beforeDisconnect = client.getConnectionState
+            ? client.getConnectionState()
+            : client.connectionState;
+          client.disconnect();
+          const afterDisconnect = client.getConnectionState
+            ? client.getConnectionState()
+            : client.connectionState;
+
+          return {
+            success: true,
+            hasDisconnect: typeof client.disconnect === "function",
+            beforeDisconnect,
+            afterDisconnect,
+          };
+        } catch (error: any) {
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : String(error),
+          };
+        }
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.hasDisconnect).toBe(true);
+      expect(typeof result.beforeDisconnect).toBe("string");
+      expect(typeof result.afterDisconnect).toBe("string");
+    }, browserConfig);
+
+    it("应该支持媒体流方法检测", async (t) => {
+      // @ts-ignore - 浏览器测试上下文
+      const result = await t.browser!.evaluate(() => {
+        const win = globalThis as any;
+        if (typeof win.WebRTCClient === "undefined") {
+          return { success: false, error: "WebRTCClient 未定义" };
+        }
+
+        try {
+          const client = new win.WebRTCClient.RTCClient({
+            signalingUrl: "http://localhost:30000",
+            autoConnect: false,
+          });
+
+          return {
+            success: true,
+            hasGetUserMedia: typeof client.getUserMedia === "function",
+            hasGetDisplayMedia: typeof client.getDisplayMedia === "function",
+            hasGetLocalStream: typeof client.getLocalStream === "function",
+            hasGetRemoteStream: typeof client.getRemoteStream === "function",
+          };
+        } catch (error: any) {
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : String(error),
+          };
+        }
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.hasGetUserMedia).toBe(true);
+      expect(result.hasGetDisplayMedia).toBe(true);
+      expect(result.hasGetLocalStream).toBe(true);
+      expect(result.hasGetRemoteStream).toBe(true);
+    }, browserConfig);
+
+    it("应该支持数据通道方法检测", async (t) => {
+      // @ts-ignore - 浏览器测试上下文
+      const result = await t.browser!.evaluate(() => {
+        const win = globalThis as any;
+        if (typeof win.WebRTCClient === "undefined") {
+          return { success: false, error: "WebRTCClient 未定义" };
+        }
+
+        try {
+          const client = new win.WebRTCClient.RTCClient({
+            signalingUrl: "http://localhost:30000",
+            autoConnect: false,
+          });
+
+          return {
+            success: true,
+            hasCreateDataChannel:
+              typeof client.createDataChannel === "function",
+          };
+        } catch (error: any) {
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : String(error),
+          };
+        }
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.hasCreateDataChannel).toBe(true);
+    }, browserConfig);
+
+    it("应该支持房间模式方法检测", async (t) => {
+      // @ts-ignore - 浏览器测试上下文
+      const result = await t.browser!.evaluate(() => {
+        const win = globalThis as any;
+        if (typeof win.WebRTCClient === "undefined") {
+          return { success: false, error: "WebRTCClient 未定义" };
+        }
+
+        try {
+          const client = new win.WebRTCClient.RTCClient({
+            signalingUrl: "http://localhost:30000",
+            autoConnect: false,
+          });
+
+          return {
+            success: true,
+            hasJoinRoom: typeof client.joinRoom === "function",
+            hasLeaveRoom: typeof client.leaveRoom === "function",
+          };
+        } catch (error: any) {
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : String(error),
+          };
+        }
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.hasJoinRoom).toBe(true);
+      expect(result.hasLeaveRoom).toBe(true);
+    }, browserConfig);
+
+    it("应该支持统计信息方法检测", async (t) => {
+      // @ts-ignore - 浏览器测试上下文
+      const result = await t.browser!.evaluate(() => {
+        const win = globalThis as any;
+        if (typeof win.WebRTCClient === "undefined") {
+          return { success: false, error: "WebRTCClient 未定义" };
+        }
+
+        try {
+          const client = new win.WebRTCClient.RTCClient({
+            signalingUrl: "http://localhost:30000",
+            autoConnect: false,
+          });
+
+          return {
+            success: true,
+            hasGetStats: typeof client.getStats === "function",
+            hasGetConnectionPoolStats:
+              typeof client.getConnectionPoolStats === "function",
+            hasGetNetworkStats: typeof client.getNetworkStats === "function",
+          };
+        } catch (error: any) {
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : String(error),
+          };
+        }
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.hasGetStats).toBe(true);
+      expect(result.hasGetConnectionPoolStats).toBe(true);
+      expect(result.hasGetNetworkStats).toBe(true);
+    }, browserConfig);
+
+    it("应该支持配置选项", async (t) => {
+      // @ts-ignore - 浏览器测试上下文
+      const result = await t.browser!.evaluate(() => {
+        try {
+          const win = globalThis as any;
+          if (typeof win.WebRTCClient === "undefined") {
+            return { success: false, error: "WebRTCClient 未定义" };
           }
 
-          try {
-            // @ts-ignore - 浏览器环境中的全局变量
-            const client = new globalThis.RTCClient({
-              signalingUrl: url,
-              autoConnect: false,
-            });
-            return {
-              success: true,
-              hasConnect: typeof client.connect === "function",
-              hasDisconnect: typeof client.disconnect === "function",
-              hasGetUserMedia: typeof client.getUserMedia === "function",
-              hasGetDisplayMedia: typeof client.getDisplayMedia === "function",
-            };
-          } catch (_error) {
-            return {
-              success: false,
-              error: _error instanceof Error ? _error.message : String(_error),
-            };
-          }
-        }, serverUrl);
+          const client = new win.WebRTCClient.RTCClient({
+            signalingUrl: "http://localhost:30000",
+            autoConnect: false,
+            iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+            reconnect: true,
+            maxReconnectAttempts: 5,
+          });
 
-        expect(result.success).toBe(true);
-        expect(result.hasConnect).toBe(true);
-        expect(result.hasDisconnect).toBe(true);
-        expect(result.hasGetUserMedia).toBe(true);
-        expect(result.hasGetDisplayMedia).toBe(true);
-      }),
-      { sanitizeOps: false, sanitizeResources: false, timeout: 10000 },
-    );
+          return {
+            success: true,
+            hasOptions: client !== null && typeof client === "object",
+          };
+        } catch (error: any) {
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : String(error),
+          };
+        }
+      });
 
-    it(
-      "应该支持 RTCPeerConnection API",
-      skipIfNoBrowser(async () => {
-        // 参考 video-player 的实现方式，使用 try-catch 包裹代码
-        const result = await page.evaluate(() => {
-          try {
-            // 这些代码在浏览器环境中执行，RTCPeerConnection 和 MediaStream 可能在 window 对象上
-            // 检查全局和 window 对象
-            // @ts-ignore - 浏览器环境中的全局 API
-            const globalRTC = typeof RTCPeerConnection !== "undefined";
-            // @ts-ignore - 浏览器环境中的全局 API
-            const win = window as any;
-            const windowRTC = typeof win.RTCPeerConnection !== "undefined";
-            const hasRTCPeerConnection = globalRTC || windowRTC;
+      expect(result.success).toBe(true);
+      expect(result.hasOptions).toBe(true);
+    }, browserConfig);
 
-            // @ts-ignore - 浏览器环境中的全局 API
-            const globalMS = typeof MediaStream !== "undefined";
-            const windowMS = typeof win.MediaStream !== "undefined";
-            const hasMediaStream = globalMS || windowMS;
+    it("应该支持 MediaStream API", async (t) => {
+      // @ts-ignore - 浏览器测试上下文
+      const result = await t.browser!.evaluate(() => {
+        try {
+          const win = globalThis as any;
+          const hasMediaStream = typeof win.MediaStream !== "undefined";
 
-            // @ts-ignore - 浏览器环境中的全局 API
-            const nav = navigator as any;
-            const hasGetUserMedia = typeof navigator !== "undefined" &&
-              typeof nav.mediaDevices !== "undefined" &&
-              typeof nav.mediaDevices.getUserMedia === "function";
-
-            return {
-              hasRTCPeerConnection,
-              hasMediaStream,
-              hasGetUserMedia,
-            };
-          } catch (_error) {
-            // 如果检测失败，返回错误状态
-            return {
-              hasRTCPeerConnection: false,
-              hasMediaStream: false,
-              hasGetUserMedia: false,
-            };
-          }
-        });
-
-        expect(result.hasRTCPeerConnection).toBe(true);
-        expect(result.hasMediaStream).toBe(true);
-        // 注意：在无头浏览器中，getUserMedia 可能不可用（需要用户授权），所以这个检查可以跳过
-        // expect(result.hasGetUserMedia).toBe(true);
-      }),
-      { sanitizeOps: false, sanitizeResources: false },
-    );
-
-    it(
-      "应该支持创建 RTCPeerConnection 实例",
-      skipIfNoBrowser(async () => {
-        // 使用字符串形式的代码，避免 TypeScript 类型检查问题
-        const result = await page.evaluate(() => {
-          try {
-            // 这些代码在浏览器环境中执行，RTCPeerConnection 是全局可用的
-            // @ts-ignore - 浏览器环境中的全局 API
-            const pc = new RTCPeerConnection({
-              iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
-            });
-            // @ts-ignore - 浏览器环境中的全局 API
-            const isValid = pc instanceof RTCPeerConnection;
-            pc.close();
-            return { success: true, isValid };
-          } catch (_error) {
-            return {
-              success: false,
-              error: _error instanceof Error ? _error.message : String(_error),
-            };
-          }
-        });
-
-        expect(result.success).toBe(true);
-        expect(result.isValid).toBe(true);
-      }),
-      { sanitizeOps: false, sanitizeResources: false },
-    );
-
-    it(
-      "应该支持事件监听",
-      skipIfNoBrowser(async () => {
-        // 使用字符串形式的代码，避免 TypeScript 类型检查问题
-        const result = await page.evaluate((url: string) => {
-          // @ts-ignore - 浏览器环境中的全局变量
-          if (typeof globalThis.RTCClient === "undefined") {
-            return { success: false, error: "RTCClient 未定义" };
+          if (!hasMediaStream) {
+            return { success: false, error: "MediaStream 不可用" };
           }
 
-          try {
-            // @ts-ignore - 浏览器环境中的全局变量
-            const client = new globalThis.RTCClient({
-              signalingUrl: url,
-              autoConnect: false,
-            });
+          const stream = new win.MediaStream();
+          const hasGetTracks = typeof stream.getTracks === "function";
+          const hasGetAudioTracks =
+            typeof stream.getAudioTracks === "function";
+          const hasGetVideoTracks =
+            typeof stream.getVideoTracks === "function";
 
-            let _eventFired = false;
-            client.on("connection-state-change", () => {
-              _eventFired = true;
-            });
+          return {
+            success: true,
+            hasMediaStream,
+            hasGetTracks,
+            hasGetAudioTracks,
+            hasGetVideoTracks,
+          };
+        } catch (error: any) {
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : String(error),
+          };
+        }
+      });
 
-            // 触发连接状态变化
-            client.connect();
+      expect(result.success).toBe(true);
+      expect(result.hasMediaStream).toBe(true);
+      expect(result.hasGetTracks).toBe(true);
+      expect(result.hasGetAudioTracks).toBe(true);
+      expect(result.hasGetVideoTracks).toBe(true);
+    }, browserConfig);
 
-            return {
-              success: true,
-              hasOn: typeof client.on === "function",
-              hasOff: typeof client.off === "function",
-            };
-          } catch (_error) {
-            return {
-              success: false,
-              error: _error instanceof Error ? _error.message : String(_error),
-            };
-          }
-        }, serverUrl);
+    it("应该支持 RTCPeerConnection 状态属性", async (t) => {
+      // @ts-ignore - 浏览器测试上下文
+      const result = await t.browser!.evaluate(() => {
+        try {
+          const win = globalThis as any;
+          const pc = new win.RTCPeerConnection({
+            iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+          });
 
-        expect(result.success).toBe(true);
-        expect(result.hasOn).toBe(true);
-        expect(result.hasOff).toBe(true);
-      }),
-      { sanitizeOps: false, sanitizeResources: false, timeout: 10000 },
-    );
+          const hasIceConnectionState =
+            typeof pc.iceConnectionState === "string";
+          const hasConnectionState = typeof pc.connectionState === "string";
+          const hasSignalingState = typeof pc.signalingState === "string";
+          const hasLocalDescription =
+            pc.localDescription === null ||
+            typeof pc.localDescription === "object";
+          const hasRemoteDescription =
+            pc.remoteDescription === null ||
+            typeof pc.remoteDescription === "object";
 
-    it(
-      "应该支持连接状态管理",
-      skipIfNoBrowser(async () => {
-        // 使用字符串形式的代码，避免 TypeScript 类型检查问题
-        const result = await page.evaluate((url: string) => {
-          // @ts-ignore - 浏览器环境中的全局变量
-          if (typeof globalThis.RTCClient === "undefined") {
-            return { success: false, error: "RTCClient 未定义" };
-          }
+          pc.close();
 
-          try {
-            // @ts-ignore - 浏览器环境中的全局变量
-            const client = new globalThis.RTCClient({
-              signalingUrl: url,
-              autoConnect: false,
-            });
+          return {
+            success: true,
+            hasIceConnectionState,
+            hasConnectionState,
+            hasSignalingState,
+            hasLocalDescription,
+            hasRemoteDescription,
+          };
+        } catch (error: any) {
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : String(error),
+          };
+        }
+      });
 
-            const initialState = client.getConnectionState
-              ? client.getConnectionState()
-              : client.connectionState;
-            client.connect();
-            const connectingState = client.getConnectionState
-              ? client.getConnectionState()
-              : client.connectionState;
-            client.disconnect();
-            const disconnectedState = client.getConnectionState
-              ? client.getConnectionState()
-              : client.connectionState;
+      expect(result.success).toBe(true);
+      expect(result.hasIceConnectionState).toBe(true);
+      expect(result.hasConnectionState).toBe(true);
+      expect(result.hasSignalingState).toBe(true);
+      expect(result.hasLocalDescription).toBe(true);
+      expect(result.hasRemoteDescription).toBe(true);
+    }, browserConfig);
 
-            return {
-              success: true,
-              initialState,
-              connectingState,
-              disconnectedState,
-            };
-          } catch (_error) {
-            return {
-              success: false,
-              error: _error instanceof Error ? _error.message : String(_error),
-            };
-          }
-        }, serverUrl);
+    it("应该支持 RTCPeerConnection 事件处理器", async (t) => {
+      // @ts-ignore - 浏览器测试上下文
+      const result = await t.browser!.evaluate(() => {
+        try {
+          const win = globalThis as any;
+          const pc = new win.RTCPeerConnection({
+            iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+          });
 
-        expect(result.success).toBe(true);
-        expect(typeof result.initialState).toBe("string");
-        expect(typeof result.connectingState).toBe("string");
-        expect(typeof result.disconnectedState).toBe("string");
-      }),
-      { sanitizeOps: false, sanitizeResources: false, timeout: 10000 },
-    );
+          const hasOnIceCandidate =
+            typeof pc.onicecandidate === "function" ||
+            pc.onicecandidate === null;
+          const hasOnIceConnectionStateChange =
+            typeof pc.oniceconnectionstatechange === "function" ||
+            pc.oniceconnectionstatechange === null;
+          const hasOnConnectionStateChange =
+            typeof pc.onconnectionstatechange === "function" ||
+            pc.onconnectionstatechange === null;
+          const hasOnTrack =
+            typeof pc.ontrack === "function" || pc.ontrack === null;
+          const hasOnDataChannel =
+            typeof pc.ondatachannel === "function" ||
+            pc.ondatachannel === null;
 
-    it(
-      "应该支持断开连接",
-      skipIfNoBrowser(async () => {
-        const result = await page.evaluate((url: string) => {
-          // @ts-ignore - 浏览器环境中的全局变量
-          if (typeof globalThis.RTCClient === "undefined") {
-            return { success: false, error: "RTCClient 未定义" };
-          }
+          pc.close();
 
-          try {
-            // @ts-ignore - 浏览器环境中的全局变量
-            const client = new globalThis.RTCClient({
-              signalingUrl: url,
-              autoConnect: false,
-            });
+          return {
+            success: true,
+            hasOnIceCandidate,
+            hasOnIceConnectionStateChange,
+            hasOnConnectionStateChange,
+            hasOnTrack,
+            hasOnDataChannel,
+          };
+        } catch (error: any) {
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : String(error),
+          };
+        }
+      });
 
-            client.connect();
-            const beforeDisconnect = client.getConnectionState
-              ? client.getConnectionState()
-              : client.connectionState;
-            client.disconnect();
-            const afterDisconnect = client.getConnectionState
-              ? client.getConnectionState()
-              : client.connectionState;
+      expect(result.success).toBe(true);
+      expect(result.hasOnIceCandidate).toBe(true);
+      expect(result.hasOnIceConnectionStateChange).toBe(true);
+      expect(result.hasOnConnectionStateChange).toBe(true);
+      expect(result.hasOnTrack).toBe(true);
+      expect(result.hasOnDataChannel).toBe(true);
+    }, browserConfig);
 
-            return {
-              success: true,
-              hasDisconnect: typeof client.disconnect === "function",
-              beforeDisconnect,
-              afterDisconnect,
-            };
-          } catch (_error) {
-            return {
-              success: false,
-              error: _error instanceof Error ? _error.message : String(_error),
-            };
-          }
-        }, serverUrl);
+    it("应该支持 RTCPeerConnection 方法", async (t) => {
+      // @ts-ignore - 浏览器测试上下文
+      const result = await t.browser!.evaluate(() => {
+        try {
+          const win = globalThis as any;
+          const pc = new win.RTCPeerConnection({
+            iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+          });
 
-        expect(result.success).toBe(true);
-        expect(result.hasDisconnect).toBe(true);
-        expect(typeof result.beforeDisconnect).toBe("string");
-        expect(typeof result.afterDisconnect).toBe("string");
-      }),
-      { sanitizeOps: false, sanitizeResources: false, timeout: 10000 },
-    );
+          const hasCreateOffer = typeof pc.createOffer === "function";
+          const hasCreateAnswer = typeof pc.createAnswer === "function";
+          const hasSetLocalDescription =
+            typeof pc.setLocalDescription === "function";
+          const hasSetRemoteDescription =
+            typeof pc.setRemoteDescription === "function";
+          const hasAddIceCandidate = typeof pc.addIceCandidate === "function";
+          const hasCreateDataChannel =
+            typeof pc.createDataChannel === "function";
+          const hasGetStats = typeof pc.getStats === "function";
+          const hasClose = typeof pc.close === "function";
 
-    it(
-      "应该支持媒体流方法检测",
-      skipIfNoBrowser(async () => {
-        const result = await page.evaluate(() => {
-          // @ts-ignore - 浏览器环境中的全局变量
-          if (typeof globalThis.RTCClient === "undefined") {
-            return { success: false, error: "RTCClient 未定义" };
-          }
+          pc.close();
 
-          try {
-            // @ts-ignore - 浏览器环境中的全局变量
-            const client = new globalThis.RTCClient({
-              signalingUrl: "http://localhost:30000",
-              autoConnect: false,
-            });
+          return {
+            success: true,
+            hasCreateOffer,
+            hasCreateAnswer,
+            hasSetLocalDescription,
+            hasSetRemoteDescription,
+            hasAddIceCandidate,
+            hasCreateDataChannel,
+            hasGetStats,
+            hasClose,
+          };
+        } catch (error: any) {
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : String(error),
+          };
+        }
+      });
 
-            return {
-              success: true,
-              hasGetUserMedia: typeof client.getUserMedia === "function",
-              hasGetDisplayMedia: typeof client.getDisplayMedia === "function",
-              hasGetLocalStream: typeof client.getLocalStream === "function",
-              hasGetRemoteStream: typeof client.getRemoteStream === "function",
-            };
-          } catch (_error) {
-            return {
-              success: false,
-              error: _error instanceof Error ? _error.message : String(_error),
-            };
-          }
-        });
+      expect(result.success).toBe(true);
+      expect(result.hasCreateOffer).toBe(true);
+      expect(result.hasCreateAnswer).toBe(true);
+      expect(result.hasSetLocalDescription).toBe(true);
+      expect(result.hasSetRemoteDescription).toBe(true);
+      expect(result.hasAddIceCandidate).toBe(true);
+      expect(result.hasCreateDataChannel).toBe(true);
+      expect(result.hasGetStats).toBe(true);
+      expect(result.hasClose).toBe(true);
+    }, browserConfig);
 
-        expect(result.success).toBe(true);
-        expect(result.hasGetUserMedia).toBe(true);
-        expect(result.hasGetDisplayMedia).toBe(true);
-        expect(result.hasGetLocalStream).toBe(true);
-        expect(result.hasGetRemoteStream).toBe(true);
-      }),
-      { sanitizeOps: false, sanitizeResources: false },
-    );
+    it("应该支持多个事件类型", async (t) => {
+      // @ts-ignore - 浏览器测试上下文
+      const result = await t.browser!.evaluate(() => {
+        const win = globalThis as any;
+        if (typeof win.WebRTCClient === "undefined") {
+          return { success: false, error: "WebRTCClient 未定义" };
+        }
 
-    it(
-      "应该支持数据通道方法检测",
-      skipIfNoBrowser(async () => {
-        const result = await page.evaluate(() => {
-          // @ts-ignore - 浏览器环境中的全局变量
-          if (typeof globalThis.RTCClient === "undefined") {
-            return { success: false, error: "RTCClient 未定义" };
-          }
+        try {
+          const client = new win.WebRTCClient.RTCClient({
+            signalingUrl: "http://localhost:30000",
+            autoConnect: false,
+          });
 
-          try {
-            // @ts-ignore - 浏览器环境中的全局变量
-            const client = new globalThis.RTCClient({
-              signalingUrl: "http://localhost:30000",
-              autoConnect: false,
-            });
+          // 测试多个事件类型
+          const eventTypes = [
+            "connection-state-change",
+            "ice-connection-state-change",
+            "signaling-state-change",
+            "track",
+            "data-channel",
+            "error",
+          ];
 
-            return {
-              success: true,
-              hasCreateDataChannel: typeof client.createDataChannel ===
-                "function",
-            };
-          } catch (_error) {
-            return {
-              success: false,
-              error: _error instanceof Error ? _error.message : String(_error),
-            };
-          }
-        });
-
-        expect(result.success).toBe(true);
-        expect(result.hasCreateDataChannel).toBe(true);
-      }),
-      { sanitizeOps: false, sanitizeResources: false },
-    );
-
-    it(
-      "应该支持房间模式方法检测",
-      skipIfNoBrowser(async () => {
-        const result = await page.evaluate(() => {
-          // @ts-ignore - 浏览器环境中的全局变量
-          if (typeof globalThis.RTCClient === "undefined") {
-            return { success: false, error: "RTCClient 未定义" };
-          }
-
-          try {
-            // @ts-ignore - 浏览器环境中的全局变量
-            const client = new globalThis.RTCClient({
-              signalingUrl: "http://localhost:30000",
-              autoConnect: false,
-            });
-
-            return {
-              success: true,
-              hasJoinRoom: typeof client.joinRoom === "function",
-              hasLeaveRoom: typeof client.leaveRoom === "function",
-            };
-          } catch (_error) {
-            return {
-              success: false,
-              error: _error instanceof Error ? _error.message : String(_error),
-            };
-          }
-        });
-
-        expect(result.success).toBe(true);
-        expect(result.hasJoinRoom).toBe(true);
-        expect(result.hasLeaveRoom).toBe(true);
-      }),
-      { sanitizeOps: false, sanitizeResources: false },
-    );
-
-    it(
-      "应该支持统计信息方法检测",
-      skipIfNoBrowser(async () => {
-        const result = await page.evaluate(() => {
-          // @ts-ignore - 浏览器环境中的全局变量
-          if (typeof globalThis.RTCClient === "undefined") {
-            return { success: false, error: "RTCClient 未定义" };
-          }
-
-          try {
-            // @ts-ignore - 浏览器环境中的全局变量
-            const client = new globalThis.RTCClient({
-              signalingUrl: "http://localhost:30000",
-              autoConnect: false,
-            });
-
-            return {
-              success: true,
-              hasGetStats: typeof client.getStats === "function",
-              hasGetConnectionPoolStats:
-                typeof client.getConnectionPoolStats ===
-                  "function",
-              hasGetNetworkStats: typeof client.getNetworkStats ===
-                "function",
-            };
-          } catch (_error) {
-            return {
-              success: false,
-              error: _error instanceof Error ? _error.message : String(_error),
-            };
-          }
-        });
-
-        expect(result.success).toBe(true);
-        expect(result.hasGetStats).toBe(true);
-        expect(result.hasGetConnectionPoolStats).toBe(true);
-        expect(result.hasGetNetworkStats).toBe(true);
-      }),
-      { sanitizeOps: false, sanitizeResources: false },
-    );
-
-    it(
-      "应该支持配置选项",
-      skipIfNoBrowser(async () => {
-        const result = await page.evaluate(() => {
-          try {
-            // @ts-ignore - 浏览器环境中的全局变量
-            if (typeof globalThis.RTCClient === "undefined") {
-              return { success: false, error: "RTCClient 未定义" };
+          const supportedEvents: string[] = [];
+          eventTypes.forEach((eventType) => {
+            try {
+              client.on(eventType, () => {});
+              supportedEvents.push(eventType);
+            } catch {
+              // 忽略不支持的事件
             }
+          });
 
-            // @ts-ignore - 浏览器环境中的全局变量
-            const client = new globalThis.RTCClient({
-              signalingUrl: "http://localhost:30000",
-              autoConnect: false,
-              iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
-              reconnect: true,
-              maxReconnectAttempts: 5,
-            });
+          return {
+            success: true,
+            supportedEventsCount: supportedEvents.length,
+            supportedEvents,
+          };
+        } catch (error: any) {
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : String(error),
+          };
+        }
+      });
 
-            return {
-              success: true,
-              hasOptions: client !== null && typeof client === "object",
-            };
-          } catch (_error) {
-            return {
-              success: false,
-              error: _error instanceof Error ? _error.message : String(_error),
-            };
-          }
-        });
-
-        expect(result.success).toBe(true);
-        expect(result.hasOptions).toBe(true);
-      }),
-      { sanitizeOps: false, sanitizeResources: false },
-    );
-
-    it(
-      "应该支持 MediaStream API",
-      skipIfNoBrowser(async () => {
-        const result = await page.evaluate(() => {
-          try {
-            // @ts-ignore - 浏览器环境中的全局 API
-            const win = window as any;
-            // @ts-ignore - 浏览器环境中的全局 API
-            const hasMediaStream = typeof win.MediaStream !== "undefined";
-
-            if (!hasMediaStream) {
-              return { success: false, error: "MediaStream 不可用" };
-            }
-
-            // @ts-ignore - 浏览器环境中的全局 API
-            const stream = new win.MediaStream();
-            const hasGetTracks = typeof stream.getTracks === "function";
-            const hasGetAudioTracks = typeof stream.getAudioTracks ===
-              "function";
-            const hasGetVideoTracks = typeof stream.getVideoTracks ===
-              "function";
-
-            return {
-              success: true,
-              hasMediaStream,
-              hasGetTracks,
-              hasGetAudioTracks,
-              hasGetVideoTracks,
-            };
-          } catch (_error) {
-            return {
-              success: false,
-              error: _error instanceof Error ? _error.message : String(_error),
-            };
-          }
-        });
-
-        expect(result.success).toBe(true);
-        expect(result.hasMediaStream).toBe(true);
-        expect(result.hasGetTracks).toBe(true);
-        expect(result.hasGetAudioTracks).toBe(true);
-        expect(result.hasGetVideoTracks).toBe(true);
-      }),
-      { sanitizeOps: false, sanitizeResources: false },
-    );
-
-    it(
-      "应该支持 RTCPeerConnection 状态属性",
-      skipIfNoBrowser(async () => {
-        const result = await page.evaluate(() => {
-          try {
-            // @ts-ignore - 浏览器环境中的全局 API
-            const pc = new RTCPeerConnection({
-              iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
-            });
-
-            const hasIceConnectionState = typeof pc.iceConnectionState ===
-              "string";
-            const hasConnectionState = typeof pc.connectionState === "string";
-            const hasSignalingState = typeof pc.signalingState === "string";
-            const hasLocalDescription = pc.localDescription === null ||
-              typeof pc.localDescription === "object";
-            const hasRemoteDescription = pc.remoteDescription === null ||
-              typeof pc.remoteDescription === "object";
-
-            pc.close();
-
-            return {
-              success: true,
-              hasIceConnectionState,
-              hasConnectionState,
-              hasSignalingState,
-              hasLocalDescription,
-              hasRemoteDescription,
-            };
-          } catch (_error) {
-            return {
-              success: false,
-              error: _error instanceof Error ? _error.message : String(_error),
-            };
-          }
-        });
-
-        expect(result.success).toBe(true);
-        expect(result.hasIceConnectionState).toBe(true);
-        expect(result.hasConnectionState).toBe(true);
-        expect(result.hasSignalingState).toBe(true);
-        expect(result.hasLocalDescription).toBe(true);
-        expect(result.hasRemoteDescription).toBe(true);
-      }),
-      { sanitizeOps: false, sanitizeResources: false },
-    );
-
-    it(
-      "应该支持 RTCPeerConnection 事件处理器",
-      skipIfNoBrowser(async () => {
-        const result = await page.evaluate(() => {
-          try {
-            // @ts-ignore - 浏览器环境中的全局 API
-            const pc = new RTCPeerConnection({
-              iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
-            });
-
-            const hasOnIceCandidate = typeof pc.onicecandidate ===
-                "function" ||
-              pc.onicecandidate === null;
-            const hasOnIceConnectionStateChange =
-              typeof pc.oniceconnectionstatechange === "function" ||
-              pc.oniceconnectionstatechange === null;
-            const hasOnConnectionStateChange =
-              typeof pc.onconnectionstatechange === "function" ||
-              pc.onconnectionstatechange === null;
-            const hasOnTrack = typeof pc.ontrack === "function" ||
-              pc.ontrack === null;
-            const hasOnDataChannel = typeof pc.ondatachannel === "function" ||
-              pc.ondatachannel === null;
-
-            pc.close();
-
-            return {
-              success: true,
-              hasOnIceCandidate,
-              hasOnIceConnectionStateChange,
-              hasOnConnectionStateChange,
-              hasOnTrack,
-              hasOnDataChannel,
-            };
-          } catch (_error) {
-            return {
-              success: false,
-              error: _error instanceof Error ? _error.message : String(_error),
-            };
-          }
-        });
-
-        expect(result.success).toBe(true);
-        expect(result.hasOnIceCandidate).toBe(true);
-        expect(result.hasOnIceConnectionStateChange).toBe(true);
-        expect(result.hasOnConnectionStateChange).toBe(true);
-        expect(result.hasOnTrack).toBe(true);
-        expect(result.hasOnDataChannel).toBe(true);
-      }),
-      { sanitizeOps: false, sanitizeResources: false },
-    );
-
-    it(
-      "应该支持 RTCPeerConnection 方法",
-      skipIfNoBrowser(async () => {
-        const result = await page.evaluate(() => {
-          try {
-            // @ts-ignore - 浏览器环境中的全局 API
-            const pc = new RTCPeerConnection({
-              iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
-            });
-
-            const hasCreateOffer = typeof pc.createOffer === "function";
-            const hasCreateAnswer = typeof pc.createAnswer === "function";
-            const hasSetLocalDescription = typeof pc.setLocalDescription ===
-              "function";
-            const hasSetRemoteDescription = typeof pc.setRemoteDescription ===
-              "function";
-            const hasAddIceCandidate = typeof pc.addIceCandidate ===
-              "function";
-            const hasCreateDataChannel = typeof pc.createDataChannel ===
-              "function";
-            const hasGetStats = typeof pc.getStats === "function";
-            const hasClose = typeof pc.close === "function";
-
-            pc.close();
-
-            return {
-              success: true,
-              hasCreateOffer,
-              hasCreateAnswer,
-              hasSetLocalDescription,
-              hasSetRemoteDescription,
-              hasAddIceCandidate,
-              hasCreateDataChannel,
-              hasGetStats,
-              hasClose,
-            };
-          } catch (_error) {
-            return {
-              success: false,
-              error: _error instanceof Error ? _error.message : String(_error),
-            };
-          }
-        });
-
-        expect(result.success).toBe(true);
-        expect(result.hasCreateOffer).toBe(true);
-        expect(result.hasCreateAnswer).toBe(true);
-        expect(result.hasSetLocalDescription).toBe(true);
-        expect(result.hasSetRemoteDescription).toBe(true);
-        expect(result.hasAddIceCandidate).toBe(true);
-        expect(result.hasCreateDataChannel).toBe(true);
-        expect(result.hasGetStats).toBe(true);
-        expect(result.hasClose).toBe(true);
-      }),
-      { sanitizeOps: false, sanitizeResources: false },
-    );
-
-    it(
-      "应该支持多个事件类型",
-      skipIfNoBrowser(async () => {
-        const result = await page.evaluate((url: string) => {
-          // @ts-ignore - 浏览器环境中的全局变量
-          if (typeof globalThis.RTCClient === "undefined") {
-            return { success: false, error: "RTCClient 未定义" };
-          }
-
-          try {
-            // @ts-ignore - 浏览器环境中的全局变量
-            const client = new globalThis.RTCClient({
-              signalingUrl: url,
-              autoConnect: false,
-            });
-
-            // 测试多个事件类型
-            const eventTypes = [
-              "connection-state-change",
-              "ice-connection-state-change",
-              "signaling-state-change",
-              "track",
-              "data-channel",
-              "error",
-            ];
-
-            const supportedEvents: string[] = [];
-            eventTypes.forEach((eventType) => {
-              try {
-                client.on(eventType, () => {});
-                supportedEvents.push(eventType);
-              } catch {
-                // 忽略不支持的事件
-              }
-            });
-
-            return {
-              success: true,
-              supportedEventsCount: supportedEvents.length,
-              supportedEvents,
-            };
-          } catch (_error) {
-            return {
-              success: false,
-              error: _error instanceof Error ? _error.message : String(_error),
-            };
-          }
-        }, serverUrl);
-
-        expect(result.success).toBe(true);
-        expect(result.supportedEventsCount).toBeGreaterThan(0);
-      }),
-      { sanitizeOps: false, sanitizeResources: false, timeout: 10000 },
-    );
-  });
+      expect(result.success).toBe(true);
+      expect(result.supportedEventsCount).toBeGreaterThan(0);
+    }, browserConfig);
+  }, browserConfig);
 
   describe("架构模式测试", () => {
-    it(
-      "应该支持 Mesh 模式配置",
-      skipIfNoBrowser(async () => {
-        const result = await page.evaluate((url: string) => {
-          try {
-            // @ts-ignore - 浏览器环境中的全局变量
-            const win = globalThis as any;
-            if (typeof win.RTCClient === "undefined") {
-              return { success: false, error: "RTCClient 未定义" };
-            }
-
-            // @ts-ignore - 浏览器环境中的全局变量
-            const client = new win.RTCClient({
-              signalingUrl: url,
-              architectureMode: "mesh",
-              autoConnect: false,
-            });
-
-            const hasClient = client !== null && client !== undefined;
-            client.disconnect();
-
-            return {
-              success: true,
-              hasClient,
-            };
-          } catch (_error) {
-            return {
-              success: false,
-              error: _error instanceof Error ? _error.message : String(_error),
-            };
+    it("应该支持 Mesh 模式配置", async (t) => {
+      // @ts-ignore - 浏览器测试上下文
+      const result = await t.browser!.evaluate(() => {
+        try {
+          const win = globalThis as any;
+          if (typeof win.WebRTCClient === "undefined") {
+            return { success: false, error: "WebRTCClient 未定义" };
           }
-        }, serverUrl);
 
-        expect(result.success).toBe(true);
-        expect(result.hasClient).toBe(true);
-      }),
-      { sanitizeOps: false, sanitizeResources: false, timeout: 10000 },
-    );
+          const client = new win.WebRTCClient.RTCClient({
+            signalingUrl: "http://localhost:30000",
+            architectureMode: "mesh",
+            autoConnect: false,
+          });
 
-    it(
-      "应该支持 SFU 模式配置",
-      skipIfNoBrowser(async () => {
-        const result = await page.evaluate((url: string) => {
-          try {
-            // @ts-ignore - 浏览器环境中的全局变量
-            const win = globalThis as any;
-            if (typeof win.RTCClient === "undefined") {
-              return { success: false, error: "RTCClient 未定义" };
-            }
+          const hasClient = client !== null && client !== undefined;
+          client.disconnect();
 
-            // @ts-ignore - 浏览器环境中的全局变量
-            const client = new win.RTCClient({
-              signalingUrl: url,
-              architectureMode: "sfu",
-              sfuOptions: {
-                url: "wss://sfu.example.com",
-              },
-              autoConnect: false,
-            });
+          return {
+            success: true,
+            hasClient,
+          };
+        } catch (error: any) {
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : String(error),
+          };
+        }
+      });
 
-            const hasClient = client !== null && client !== undefined;
-            client.disconnect();
+      expect(result.success).toBe(true);
+      expect(result.hasClient).toBe(true);
+    }, browserConfig);
 
-            return {
-              success: true,
-              hasClient,
-            };
-          } catch (_error) {
-            return {
-              success: false,
-              error: _error instanceof Error ? _error.message : String(_error),
-            };
+    it("应该支持 SFU 模式配置", async (t) => {
+      // @ts-ignore - 浏览器测试上下文
+      const result = await t.browser!.evaluate(() => {
+        try {
+          const win = globalThis as any;
+          if (typeof win.WebRTCClient === "undefined") {
+            return { success: false, error: "WebRTCClient 未定义" };
           }
-        }, serverUrl);
 
-        expect(result.success).toBe(true);
-        expect(result.hasClient).toBe(true);
-      }),
-      { sanitizeOps: false, sanitizeResources: false, timeout: 10000 },
-    );
+          const client = new win.WebRTCClient.RTCClient({
+            signalingUrl: "http://localhost:30000",
+            architectureMode: "sfu",
+            sfuOptions: {
+              url: "wss://sfu.example.com",
+            },
+            autoConnect: false,
+          });
 
-    it(
-      "应该支持自动模式（Auto）配置",
-      skipIfNoBrowser(async () => {
-        const result = await page.evaluate((url: string) => {
-          try {
-            // @ts-ignore - 浏览器环境中的全局变量
-            const win = globalThis as any;
-            if (typeof win.RTCClient === "undefined") {
-              return { success: false, error: "RTCClient 未定义" };
-            }
+          const hasClient = client !== null && client !== undefined;
+          client.disconnect();
 
-            // @ts-ignore - 浏览器环境中的全局变量
-            const client = new win.RTCClient({
-              signalingUrl: url,
-              architectureMode: "auto",
-              meshToSFUThreshold: 10,
-              autoConnect: false,
-            });
+          return {
+            success: true,
+            hasClient,
+          };
+        } catch (error: any) {
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : String(error),
+          };
+        }
+      });
 
-            const hasClient = client !== null && client !== undefined;
-            client.disconnect();
+      expect(result.success).toBe(true);
+      expect(result.hasClient).toBe(true);
+    }, browserConfig);
 
-            return {
-              success: true,
-              hasClient,
-            };
-          } catch (_error) {
-            return {
-              success: false,
-              error: _error instanceof Error ? _error.message : String(_error),
-            };
+    it("应该支持自动模式（Auto）配置", async (t) => {
+      // @ts-ignore - 浏览器测试上下文
+      const result = await t.browser!.evaluate(() => {
+        try {
+          const win = globalThis as any;
+          if (typeof win.WebRTCClient === "undefined") {
+            return { success: false, error: "WebRTCClient 未定义" };
           }
-        }, serverUrl);
 
-        expect(result.success).toBe(true);
-        expect(result.hasClient).toBe(true);
-      }),
-      { sanitizeOps: false, sanitizeResources: false, timeout: 10000 },
-    );
+          const client = new win.WebRTCClient.RTCClient({
+            signalingUrl: "http://localhost:30000",
+            architectureMode: "auto",
+            meshToSFUThreshold: 10,
+            autoConnect: false,
+          });
 
-    it(
-      "应该支持自定义切换阈值",
-      skipIfNoBrowser(async () => {
-        const result = await page.evaluate((url: string) => {
-          try {
-            // @ts-ignore - 浏览器环境中的全局变量
-            const win = globalThis as any;
-            if (typeof win.RTCClient === "undefined") {
-              return { success: false, error: "RTCClient 未定义" };
-            }
+          const hasClient = client !== null && client !== undefined;
+          client.disconnect();
 
-            // @ts-ignore - 浏览器环境中的全局变量
-            const client = new win.RTCClient({
-              signalingUrl: url,
-              architectureMode: "auto",
-              meshToSFUThreshold: 5,
-              autoConnect: false,
-            });
+          return {
+            success: true,
+            hasClient,
+          };
+        } catch (error: any) {
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : String(error),
+          };
+        }
+      });
 
-            const hasClient = client !== null && client !== undefined;
-            client.disconnect();
+      expect(result.success).toBe(true);
+      expect(result.hasClient).toBe(true);
+    }, browserConfig);
 
-            return {
-              success: true,
-              hasClient,
-            };
-          } catch (_error) {
-            return {
-              success: false,
-              error: _error instanceof Error ? _error.message : String(_error),
-            };
+    it("应该支持自定义切换阈值", async (t) => {
+      // @ts-ignore - 浏览器测试上下文
+      const result = await t.browser!.evaluate(() => {
+        try {
+          const win = globalThis as any;
+          if (typeof win.WebRTCClient === "undefined") {
+            return { success: false, error: "WebRTCClient 未定义" };
           }
-        }, serverUrl);
 
-        expect(result.success).toBe(true);
-        expect(result.hasClient).toBe(true);
-      }),
-      { sanitizeOps: false, sanitizeResources: false, timeout: 10000 },
-    );
+          const client = new win.WebRTCClient.RTCClient({
+            signalingUrl: "http://localhost:30000",
+            architectureMode: "auto",
+            meshToSFUThreshold: 5,
+            autoConnect: false,
+          });
 
-    it(
-      "应该在 Mesh 模式下创建点对点连接",
-      skipIfNoBrowser(async () => {
-        const result = await page.evaluate(async (url: string) => {
-          try {
-            // @ts-ignore - 浏览器环境中的全局变量
-            const win = globalThis as any;
-            if (typeof win.RTCClient === "undefined") {
-              return { success: false, error: "RTCClient 未定义" };
-            }
+          const hasClient = client !== null && client !== undefined;
+          client.disconnect();
 
-            // @ts-ignore - 浏览器环境中的全局变量
-            const client = new win.RTCClient({
-              signalingUrl: url,
-              architectureMode: "mesh",
-              autoConnect: true,
-            });
+          return {
+            success: true,
+            hasClient,
+          };
+        } catch (error: any) {
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : String(error),
+          };
+        }
+      });
 
-            // 等待连接建立
-            await new Promise((resolve) => setTimeout(resolve, 500));
+      expect(result.success).toBe(true);
+      expect(result.hasClient).toBe(true);
+    }, browserConfig);
 
-            // 尝试加入房间（这会触发 PeerConnection 创建）
-            try {
-              await client.joinRoom("test-room-mesh", "user1");
-              await new Promise((resolve) => setTimeout(resolve, 500));
-
-              // 检查是否有 PeerConnection（通过检查是否有连接状态）
-              const hasConnection = true; // 如果能成功加入房间，说明连接已创建
-
-              client.leaveRoom();
-              client.disconnect();
-
-              return {
-                success: true,
-                hasConnection,
-              };
-            } catch (joinError) {
-              client.disconnect();
-              return {
-                success: false,
-                error: joinError instanceof Error
-                  ? joinError.message
-                  : String(joinError),
-              };
-            }
-          } catch (_error) {
-            return {
-              success: false,
-              error: _error instanceof Error ? _error.message : String(_error),
-            };
+    it("应该在没有指定架构模式时默认使用 auto", async (t) => {
+      // @ts-ignore - 浏览器测试上下文
+      const result = await t.browser!.evaluate(() => {
+        try {
+          const win = globalThis as any;
+          if (typeof win.WebRTCClient === "undefined") {
+            return { success: false, error: "WebRTCClient 未定义" };
           }
-        }, serverUrl);
 
-        // 注意：这个测试可能会因为需要实际的媒体流而失败，这是正常的
-        // 我们主要测试配置是否正确
-        expect(result.success).toBeDefined();
-      }),
-      { sanitizeOps: false, sanitizeResources: false, timeout: 15000 },
-    );
+          // 不指定 architectureMode，应该默认使用 "auto"
+          const client = new win.WebRTCClient.RTCClient({
+            signalingUrl: "http://localhost:30000",
+            autoConnect: false,
+          });
 
-    it(
-      "应该在自动模式下根据房间人数切换架构",
-      skipIfNoBrowser(async () => {
-        const result = await page.evaluate(async (url: string) => {
-          try {
-            // @ts-ignore - 浏览器环境中的全局变量
-            const win = globalThis as any;
-            if (typeof win.RTCClient === "undefined") {
-              return { success: false, error: "RTCClient 未定义" };
-            }
+          const hasClient = client !== null && client !== undefined;
+          client.disconnect();
 
-            // 创建客户端，使用较低的阈值以便测试
-            // @ts-ignore - 浏览器环境中的全局变量
-            const client = new win.RTCClient({
-              signalingUrl: url,
-              architectureMode: "auto",
-              meshToSFUThreshold: 3,
-              sfuOptions: {
-                url: "wss://sfu.example.com",
-              },
-              autoConnect: true,
-            });
+          return {
+            success: true,
+            hasClient,
+          };
+        } catch (error: any) {
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : String(error),
+          };
+        }
+      });
 
-            // 等待连接建立
-            await new Promise((resolve) => setTimeout(resolve, 500));
+      expect(result.success).toBe(true);
+      expect(result.hasClient).toBe(true);
+    }, browserConfig);
 
-            // 尝试加入房间
-            try {
-              await client.joinRoom("test-room-auto", "user1");
-              await new Promise((resolve) => setTimeout(resolve, 500));
-
-              // 检查客户端是否正常工作
-              const hasClient = client !== null && client !== undefined;
-
-              client.leaveRoom();
-              client.disconnect();
-
-              return {
-                success: true,
-                hasClient,
-                message: "自动模式配置成功",
-              };
-            } catch (joinError) {
-              client.disconnect();
-              return {
-                success: false,
-                error: joinError instanceof Error
-                  ? joinError.message
-                  : String(joinError),
-              };
-            }
-          } catch (_error) {
-            return {
-              success: false,
-              error: _error instanceof Error ? _error.message : String(_error),
-            };
+    it("应该在没有指定阈值时使用默认值 10", async (t) => {
+      // @ts-ignore - 浏览器测试上下文
+      const result = await t.browser!.evaluate(() => {
+        try {
+          const win = globalThis as any;
+          if (typeof win.WebRTCClient === "undefined") {
+            return { success: false, error: "WebRTCClient 未定义" };
           }
-        }, serverUrl);
 
-        // 注意：这个测试主要验证配置是否正确，实际切换逻辑需要多个客户端
-        expect(result.success).toBeDefined();
-      }),
-      { sanitizeOps: false, sanitizeResources: false, timeout: 15000 },
-    );
+          // 不指定 meshToSFUThreshold，应该使用默认值 10
+          const client = new win.WebRTCClient.RTCClient({
+            signalingUrl: "http://localhost:30000",
+            architectureMode: "auto",
+            autoConnect: false,
+          });
 
-    it(
-      "应该在没有指定架构模式时默认使用 auto",
-      skipIfNoBrowser(async () => {
-        const result = await page.evaluate((url: string) => {
-          try {
-            // @ts-ignore - 浏览器环境中的全局变量
-            const win = globalThis as any;
-            if (typeof win.RTCClient === "undefined") {
-              return { success: false, error: "RTCClient 未定义" };
-            }
+          const hasClient = client !== null && client !== undefined;
+          client.disconnect();
 
-            // 不指定 architectureMode，应该默认使用 "auto"
-            // @ts-ignore - 浏览器环境中的全局变量
-            const client = new win.RTCClient({
-              signalingUrl: url,
-              autoConnect: false,
-            });
+          return {
+            success: true,
+            hasClient,
+          };
+        } catch (error: any) {
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : String(error),
+          };
+        }
+      });
 
-            const hasClient = client !== null && client !== undefined;
-            client.disconnect();
-
-            return {
-              success: true,
-              hasClient,
-            };
-          } catch (_error) {
-            return {
-              success: false,
-              error: _error instanceof Error ? _error.message : String(_error),
-            };
-          }
-        }, serverUrl);
-
-        expect(result.success).toBe(true);
-        expect(result.hasClient).toBe(true);
-      }),
-      { sanitizeOps: false, sanitizeResources: false, timeout: 10000 },
-    );
-
-    it(
-      "应该在没有指定阈值时使用默认值 10",
-      skipIfNoBrowser(async () => {
-        const result = await page.evaluate((url: string) => {
-          try {
-            // @ts-ignore - 浏览器环境中的全局变量
-            const win = globalThis as any;
-            if (typeof win.RTCClient === "undefined") {
-              return { success: false, error: "RTCClient 未定义" };
-            }
-
-            // 不指定 meshToSFUThreshold，应该使用默认值 10
-            // @ts-ignore - 浏览器环境中的全局变量
-            const client = new win.RTCClient({
-              signalingUrl: url,
-              architectureMode: "auto",
-              autoConnect: false,
-            });
-
-            const hasClient = client !== null && client !== undefined;
-            client.disconnect();
-
-            return {
-              success: true,
-              hasClient,
-            };
-          } catch (_error) {
-            return {
-              success: false,
-              error: _error instanceof Error ? _error.message : String(_error),
-            };
-          }
-        }, serverUrl);
-
-        expect(result.success).toBe(true);
-        expect(result.hasClient).toBe(true);
-      }),
-      { sanitizeOps: false, sanitizeResources: false, timeout: 10000 },
-    );
-  });
-});
+      expect(result.success).toBe(true);
+      expect(result.hasClient).toBe(true);
+    }, browserConfig);
+  }, browserConfig);
+}, browserConfig);
