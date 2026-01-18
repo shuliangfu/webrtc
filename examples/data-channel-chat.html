@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebRTC 数据通道聊天示例</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    .left-panel, .right-panel {
+      display: flex;
+      flex-direction: column;
+    }
+    .controls {
+      margin-bottom: 20px;
+      padding: 15px;
+      background: #f5f5f5;
+      border-radius: 8px;
+      display: flex;
+      gap: 15px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .controls label {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .controls input {
+      padding: 8px;
+      font-size: 14px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      background: #007bff;
+      color: white;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    .status {
+      margin-bottom: 20px;
+      padding: 10px;
+      background: #e3f2fd;
+      border-radius: 4px;
+      font-weight: bold;
+    }
+    .chat-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      overflow: hidden;
+      background: white;
+    }
+    .chat-messages {
+      flex: 1;
+      padding: 15px;
+      overflow-y: auto;
+      background: #f9f9f9;
+      min-height: 300px;
+    }
+    .message {
+      margin-bottom: 15px;
+      padding: 10px;
+      border-radius: 8px;
+      max-width: 80%;
+    }
+    .message.sent {
+      background: #007bff;
+      color: white;
+      margin-left: auto;
+      text-align: right;
+    }
+    .message.received {
+      background: #e9ecef;
+      color: #333;
+    }
+    .message .sender {
+      font-size: 12px;
+      font-weight: bold;
+      margin-bottom: 5px;
+      opacity: 0.8;
+    }
+    .message .content {
+      word-wrap: break-word;
+    }
+    .message .time {
+      font-size: 11px;
+      margin-top: 5px;
+      opacity: 0.7;
+    }
+    .chat-input {
+      display: flex;
+      gap: 10px;
+      padding: 15px;
+      background: white;
+      border-top: 1px solid #ddd;
+    }
+    .chat-input input {
+      flex: 1;
+      padding: 10px;
+      font-size: 14px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    .chat-input button {
+      padding: 10px 20px;
+    }
+    .video-container {
+      margin-bottom: 20px;
+    }
+    video {
+      width: 100%;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      background: #000;
+    }
+    .data-channel-status {
+      padding: 10px;
+      background: #fff3cd;
+      border-radius: 4px;
+      margin-bottom: 20px;
+      font-size: 14px;
+    }
+    .data-channel-status.connected {
+      background: #d4edda;
+      color: #155724;
+    }
+  </style>
+</head>
+<body>
+  <div class="left-panel">
+    <h1>WebRTC 数据通道聊天示例</h1>
+
+    <div class="controls">
+      <label>
+        信令服务器 URL:
+        <input type="text" id="signalingUrl" value="http://localhost:3000" style="width: 200px;">
+      </label>
+      <label>
+        房间 ID:
+        <input type="text" id="roomId" value="chat-room-123" style="width: 150px;">
+      </label>
+      <label>
+        用户 ID:
+        <input type="text" id="userId" value="user-" style="width: 150px;">
+      </label>
+      <button type="button" id="connectBtn">连接</button>
+      <button type="button" id="joinRoomBtn" disabled>加入房间</button>
+      <button type="button" id="leaveRoomBtn" disabled>离开房间</button>
+      <button type="button" id="disconnectBtn" disabled>断开连接</button>
+    </div>
+
+    <div class="status" id="status">未连接</div>
+
+    <div class="data-channel-status" id="dataChannelStatus">
+      数据通道：未连接
+    </div>
+
+    <div class="video-container">
+      <h3>视频通话</h3>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+        <div>
+          <h4>本地视频</h4>
+          <video id="localVideo" autoplay muted playsinline></video>
+        </div>
+        <div>
+          <h4>远程视频</h4>
+          <video id="remoteVideo" autoplay playsinline></video>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="right-panel">
+    <h2>聊天消息</h2>
+    <div class="chat-container">
+      <div class="chat-messages" id="chatMessages">
+        <div class="message" style="background: #e3f2fd; text-align: center; max-width: 100%;">
+          <div class="content">等待连接...</div>
+        </div>
+      </div>
+      <div class="chat-input">
+        <input type="text" id="messageInput" placeholder="输入消息..." disabled>
+        <button type="button" id="sendBtn" disabled>发送</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    // 使用 esm.sh 提供的 npm 镜像（浏览器环境）
+    import { RTCClient } from "https://esm.sh/@jsr/dreamer__webrtc@1.0.0-beta.1/es2022/client.bundle.mjs";
+
+    const signalingUrlInput = document.getElementById("signalingUrl");
+    const roomIdInput = document.getElementById("roomId");
+    const userIdInput = document.getElementById("userId");
+    const connectBtn = document.getElementById("connectBtn");
+    const joinRoomBtn = document.getElementById("joinRoomBtn");
+    const leaveRoomBtn = document.getElementById("leaveRoomBtn");
+    const disconnectBtn = document.getElementById("disconnectBtn");
+    const statusDiv = document.getElementById("status");
+    const dataChannelStatusDiv = document.getElementById("dataChannelStatus");
+    const localVideo = document.getElementById("localVideo");
+    const remoteVideo = document.getElementById("remoteVideo");
+    const chatMessages = document.getElementById("chatMessages");
+    const messageInput = document.getElementById("messageInput");
+    const sendBtn = document.getElementById("sendBtn");
+
+    let client = null;
+    let dataChannel = null;
+
+    /**
+     * 更新状态显示
+     */
+    function updateStatus(message) {
+      statusDiv.textContent = message;
+      console.log(message);
+    }
+
+    /**
+     * 更新数据通道状态
+     */
+    function updateDataChannelStatus(connected) {
+      if (connected) {
+        dataChannelStatusDiv.textContent = "数据通道：已连接";
+        dataChannelStatusDiv.className = "data-channel-status connected";
+        messageInput.disabled = false;
+        sendBtn.disabled = false;
+      } else {
+        dataChannelStatusDiv.textContent = "数据通道：未连接";
+        dataChannelStatusDiv.className = "data-channel-status";
+        messageInput.disabled = true;
+        sendBtn.disabled = true;
+      }
+    }
+
+    /**
+     * 更新按钮状态
+     */
+    function updateButtons(connected, inRoom) {
+      connectBtn.disabled = connected;
+      joinRoomBtn.disabled = !connected || inRoom;
+      leaveRoomBtn.disabled = !inRoom;
+      disconnectBtn.disabled = !connected;
+    }
+
+    /**
+     * 添加聊天消息
+     */
+    function addMessage(sender, content, isSent = false) {
+      const messageDiv = document.createElement("div");
+      messageDiv.className = `message ${isSent ? "sent" : "received"}`;
+
+      const senderDiv = document.createElement("div");
+      senderDiv.className = "sender";
+      senderDiv.textContent = isSent ? "我" : sender;
+
+      const contentDiv = document.createElement("div");
+      contentDiv.className = "content";
+      contentDiv.textContent = content;
+
+      const timeDiv = document.createElement("div");
+      timeDiv.className = "time";
+      timeDiv.textContent = new Date().toLocaleTimeString();
+
+      messageDiv.appendChild(senderDiv);
+      messageDiv.appendChild(contentDiv);
+      messageDiv.appendChild(timeDiv);
+      chatMessages.appendChild(messageDiv);
+
+      // 滚动到底部
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    /**
+     * 连接按钮事件
+     */
+    connectBtn.addEventListener("click", async () => {
+      try {
+        const signalingUrl = signalingUrlInput.value;
+        updateStatus("正在连接...");
+
+        client = new RTCClient({
+          signalingUrl,
+          autoConnect: true,
+        });
+
+        // 监听连接状态
+        client.on("connection-state-change", (state) => {
+          updateStatus(`连接状态: ${state}`);
+          updateButtons(state === "connected", false);
+        });
+
+        // 监听 ICE 连接状态
+        client.on("ice-connection-state-change", (state) => {
+          updateStatus(`ICE 连接状态: ${state}`);
+        });
+
+        // 监听媒体流
+        client.on("stream", (stream) => {
+          const localStream = client.getLocalStream();
+          if (stream.id === localStream?.id) {
+            localVideo.srcObject = stream;
+            updateStatus("本地媒体流已设置");
+          } else {
+            remoteVideo.srcObject = stream;
+            updateStatus("远程媒体流已设置");
+          }
+        });
+
+        // 监听数据通道
+        client.on("data-channel", (channel) => {
+          dataChannel = channel;
+          updateStatus("数据通道已创建");
+
+          // 设置数据通道事件处理
+          channel.onopen = () => {
+            updateDataChannelStatus(true);
+            updateStatus("数据通道已打开");
+            addMessage("系统", "数据通道已连接，可以开始聊天了", false);
+          };
+
+          channel.onclose = () => {
+            updateDataChannelStatus(false);
+            updateStatus("数据通道已关闭");
+            addMessage("系统", "数据通道已断开", false);
+          };
+
+          channel.onerror = (error) => {
+            updateStatus(`数据通道错误: ${error.message}`);
+            console.error("数据通道错误:", error);
+          };
+
+          channel.onmessage = (event) => {
+            const message = event.data;
+            try {
+              // 尝试解析 JSON 消息
+              const data = JSON.parse(message);
+              if (data.type === "chat" && data.content) {
+                addMessage(data.sender || "对方", data.content, false);
+              } else {
+                addMessage("对方", message, false);
+              }
+            } catch {
+              // 如果不是 JSON，直接显示文本
+              addMessage("对方", message, false);
+            }
+          };
+        });
+
+        // 监听错误
+        client.on("error", (error) => {
+          updateStatus(`错误: ${error.message}`);
+          console.error("WebRTC 错误:", error);
+        });
+
+        updateStatus("客户端已创建，等待连接...");
+      } catch (error) {
+        updateStatus(`连接失败: ${error.message}`);
+        console.error("连接错误:", error);
+      }
+    });
+
+    /**
+     * 加入房间按钮事件
+     */
+    joinRoomBtn.addEventListener("click", async () => {
+      try {
+        const roomId = roomIdInput.value;
+        let userId = userIdInput.value;
+
+        // 如果用户ID为空，生成一个随机ID
+        if (!userId || userId === "user-") {
+          userId = `user-${Math.random().toString(36).substr(2, 9)}`;
+          userIdInput.value = userId;
+        }
+
+        updateStatus(`正在加入房间 ${roomId}...`);
+
+        // 获取本地媒体流
+        await client.getUserMedia({ video: true, audio: true });
+
+        // 创建数据通道
+        dataChannel = client.createDataChannel("chat", {
+          ordered: true, // 保证消息顺序
+        });
+
+        if (dataChannel) {
+          // 设置数据通道事件处理
+          dataChannel.onopen = () => {
+            updateDataChannelStatus(true);
+            updateStatus("数据通道已打开");
+            addMessage("系统", "数据通道已连接，可以开始聊天了", false);
+          };
+
+          dataChannel.onclose = () => {
+            updateDataChannelStatus(false);
+            updateStatus("数据通道已关闭");
+          };
+
+          dataChannel.onerror = (error) => {
+            updateStatus(`数据通道错误: ${error.message}`);
+            console.error("数据通道错误:", error);
+          };
+
+          dataChannel.onmessage = (event) => {
+            const message = event.data;
+            try {
+              // 尝试解析 JSON 消息
+              const data = JSON.parse(message);
+              if (data.type === "chat" && data.content) {
+                addMessage(data.sender || "对方", data.content, false);
+              } else {
+                addMessage("对方", message, false);
+              }
+            } catch {
+              // 如果不是 JSON，直接显示文本
+              addMessage("对方", message, false);
+            }
+          };
+        }
+
+        // 加入房间
+        await client.joinRoom(roomId, userId);
+        updateStatus(`已加入房间 ${roomId}，用户ID: ${userId}`);
+        updateButtons(true, true);
+
+        // 清空聊天消息
+        chatMessages.innerHTML = "";
+        addMessage("系统", `已加入房间 ${roomId}`, false);
+      } catch (error) {
+        updateStatus(`加入房间失败: ${error.message}`);
+        console.error("加入房间错误:", error);
+      }
+    });
+
+    /**
+     * 发送消息
+     */
+    function sendMessage() {
+      if (!dataChannel || dataChannel.readyState !== "open") {
+        updateStatus("数据通道未连接，无法发送消息");
+        return;
+      }
+
+      const message = messageInput.value.trim();
+      if (!message) {
+        return;
+      }
+
+      // 发送 JSON 格式的消息
+      const messageData = {
+        type: "chat",
+        sender: userIdInput.value || "我",
+        content: message,
+        timestamp: Date.now(),
+      };
+
+      try {
+        dataChannel.send(JSON.stringify(messageData));
+        addMessage("我", message, true);
+        messageInput.value = "";
+      } catch (error) {
+        updateStatus(`发送消息失败: ${error.message}`);
+        console.error("发送消息错误:", error);
+      }
+    }
+
+    /**
+     * 发送按钮事件
+     */
+    sendBtn.addEventListener("click", sendMessage);
+
+    /**
+     * 输入框回车事件
+     */
+    messageInput.addEventListener("keypress", (e) => {
+      if (e.key === "Enter") {
+        sendMessage();
+      }
+    });
+
+    /**
+     * 离开房间按钮事件
+     */
+    leaveRoomBtn.addEventListener("click", async () => {
+      try {
+        await client.leaveRoom();
+        updateStatus("已离开房间");
+        updateButtons(true, false);
+        updateDataChannelStatus(false);
+        dataChannel = null;
+        addMessage("系统", "已离开房间", false);
+      } catch (error) {
+        updateStatus(`离开房间失败: ${error.message}`);
+        console.error("离开房间错误:", error);
+      }
+    });
+
+    /**
+     * 断开连接按钮事件
+     */
+    disconnectBtn.addEventListener("click", async () => {
+      try {
+        await client.disconnect();
+        updateStatus("已断开连接");
+        updateButtons(false, false);
+        updateDataChannelStatus(false);
+        dataChannel = null;
+        localVideo.srcObject = null;
+        remoteVideo.srcObject = null;
+        client = null;
+        chatMessages.innerHTML = "";
+        addMessage("系统", "已断开连接", false);
+      } catch (error) {
+        updateStatus(`断开连接失败: ${error.message}`);
+        console.error("断开连接错误:", error);
+      }
+    });
+
+    // 初始化按钮状态
+    updateButtons(false, false);
+    updateDataChannelStatus(false);
+  </script>
+</body>
+</html>

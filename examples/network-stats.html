@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebRTC 网络质量监控示例</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .controls {
+      margin-bottom: 20px;
+      padding: 15px;
+      background: #f5f5f5;
+      border-radius: 8px;
+      display: flex;
+      gap: 15px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .controls label {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .controls input {
+      padding: 8px;
+      font-size: 14px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      background: #007bff;
+      color: white;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    .status {
+      margin-bottom: 20px;
+      padding: 10px;
+      background: #e3f2fd;
+      border-radius: 4px;
+      font-weight: bold;
+    }
+    .main-content {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    .video-container {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    video {
+      width: 100%;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      background: #000;
+    }
+    .stats-container {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+    .stats-panel {
+      padding: 15px;
+      background: #f9f9f9;
+      border-radius: 8px;
+      border: 1px solid #ddd;
+    }
+    .stats-panel h3 {
+      margin-top: 0;
+      margin-bottom: 15px;
+      color: #333;
+    }
+    .stat-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px;
+      margin: 5px 0;
+      background: white;
+      border-radius: 4px;
+      border-left: 4px solid #007bff;
+    }
+    .stat-item .label {
+      font-weight: bold;
+      color: #666;
+    }
+    .stat-item .value {
+      color: #333;
+      font-family: monospace;
+    }
+    .stat-item.good .value {
+      color: #28a745;
+    }
+    .stat-item.warning .value {
+      color: #ffc107;
+    }
+    .stat-item.bad .value {
+      color: #dc3545;
+    }
+    .quality-indicator {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      margin-right: 8px;
+    }
+    .quality-indicator.excellent {
+      background: #28a745;
+    }
+    .quality-indicator.good {
+      background: #17a2b8;
+    }
+    .quality-indicator.fair {
+      background: #ffc107;
+    }
+    .quality-indicator.poor {
+      background: #dc3545;
+    }
+    .chart-container {
+      margin-top: 20px;
+      padding: 15px;
+      background: white;
+      border-radius: 8px;
+      border: 1px solid #ddd;
+    }
+    .chart {
+      height: 200px;
+      position: relative;
+      border: 1px solid #eee;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .chart-line {
+      position: absolute;
+      bottom: 0;
+      width: 2px;
+      background: #007bff;
+    }
+  </style>
+</head>
+<body>
+  <h1>WebRTC 网络质量监控示例</h1>
+
+  <div class="controls">
+    <label>
+      信令服务器 URL:
+      <input type="text" id="signalingUrl" value="http://localhost:3000" style="width: 250px;">
+    </label>
+    <label>
+      房间 ID:
+      <input type="text" id="roomId" value="stats-room" style="width: 150px;">
+    </label>
+    <label>
+      用户 ID:
+      <input type="text" id="userId" value="user-" style="width: 150px;">
+    </label>
+    <button type="button" id="connectBtn">连接</button>
+    <button type="button" id="joinRoomBtn" disabled>加入房间</button>
+    <button type="button" id="leaveRoomBtn" disabled>离开房间</button>
+    <button type="button" id="disconnectBtn" disabled>断开连接</button>
+  </div>
+
+  <div class="status" id="status">未连接</div>
+
+  <div class="main-content">
+    <div class="video-container">
+      <div>
+        <h3>本地视频</h3>
+        <video id="localVideo" autoplay muted playsinline></video>
+      </div>
+      <div>
+        <h3>远程视频</h3>
+        <video id="remoteVideo" autoplay playsinline></video>
+      </div>
+    </div>
+
+    <div class="stats-container">
+      <div class="stats-panel">
+        <h3>网络质量概览</h3>
+        <div class="stat-item">
+          <span class="label">整体质量</span>
+          <span class="value" id="overallQuality">
+            <span class="quality-indicator" id="qualityIndicator"></span>
+            <span id="qualityText">-</span>
+          </span>
+        </div>
+        <div class="stat-item">
+          <span class="label">带宽</span>
+          <span class="value" id="bandwidth">-</span>
+        </div>
+        <div class="stat-item">
+          <span class="label">丢包率</span>
+          <span class="value" id="packetLoss">-</span>
+        </div>
+        <div class="stat-item">
+          <span class="label">往返时延 (RTT)</span>
+          <span class="value" id="rtt">-</span>
+        </div>
+      </div>
+
+      <div class="stats-panel">
+        <h3>连接统计</h3>
+        <div class="stat-item">
+          <span class="label">连接状态</span>
+          <span class="value" id="connectionState">-</span>
+        </div>
+        <div class="stat-item">
+          <span class="label">ICE 连接状态</span>
+          <span class="value" id="iceConnectionState">-</span>
+        </div>
+        <div class="stat-item">
+          <span class="label">已发送消息数</span>
+          <span class="value" id="messagesSent">0</span>
+        </div>
+        <div class="stat-item">
+          <span class="label">已接收消息数</span>
+          <span class="value" id="messagesReceived">0</span>
+        </div>
+        <div class="stat-item">
+          <span class="label">错误数</span>
+          <span class="value" id="errors">0</span>
+        </div>
+        <div class="stat-item">
+          <span class="label">重连次数</span>
+          <span class="value" id="reconnections">0</span>
+        </div>
+      </div>
+
+      <div class="stats-panel">
+        <h3>实时数据趋势</h3>
+        <div class="chart-container">
+          <div class="chart" id="bandwidthChart"></div>
+          <div style="margin-top: 10px; text-align: center; color: #666; font-size: 12px;">
+            带宽趋势 (最近 30 秒)
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    // 使用 esm.sh 提供的 npm 镜像（浏览器环境）
+    import { RTCClient } from "https://esm.sh/@jsr/dreamer__webrtc@1.0.0-beta.1/es2022/client.bundle.mjs";
+
+    const signalingUrlInput = document.getElementById("signalingUrl");
+    const roomIdInput = document.getElementById("roomId");
+    const userIdInput = document.getElementById("userId");
+    const connectBtn = document.getElementById("connectBtn");
+    const joinRoomBtn = document.getElementById("joinRoomBtn");
+    const leaveRoomBtn = document.getElementById("leaveRoomBtn");
+    const disconnectBtn = document.getElementById("disconnectBtn");
+    const statusDiv = document.getElementById("status");
+    const localVideo = document.getElementById("localVideo");
+    const remoteVideo = document.getElementById("remoteVideo");
+
+    // 统计元素
+    const overallQualitySpan = document.getElementById("qualityText");
+    const qualityIndicator = document.getElementById("qualityIndicator");
+    const bandwidthSpan = document.getElementById("bandwidth");
+    const packetLossSpan = document.getElementById("packetLoss");
+    const rttSpan = document.getElementById("rtt");
+    const connectionStateSpan = document.getElementById("connectionState");
+    const iceConnectionStateSpan = document.getElementById("iceConnectionState");
+    const messagesSentSpan = document.getElementById("messagesSent");
+    const messagesReceivedSpan = document.getElementById("messagesReceived");
+    const errorsSpan = document.getElementById("errors");
+    const reconnectionsSpan = document.getElementById("reconnections");
+    const bandwidthChart = document.getElementById("bandwidthChart");
+
+    let client = null;
+    let statsInterval = null;
+    const bandwidthHistory = [];
+
+    /**
+     * 更新状态显示
+     */
+    function updateStatus(message) {
+      statusDiv.textContent = message;
+      console.log(message);
+    }
+
+    /**
+     * 更新按钮状态
+     */
+    function updateButtons(connected, inRoom) {
+      connectBtn.disabled = connected;
+      joinRoomBtn.disabled = !connected || inRoom;
+      leaveRoomBtn.disabled = !inRoom;
+      disconnectBtn.disabled = !connected;
+    }
+
+    /**
+     * 更新网络质量显示
+     */
+    function updateNetworkStats() {
+      if (!client) {
+        return;
+      }
+
+      const networkStats = client.getNetworkStats();
+      const stats = client.getStats();
+
+      // 更新网络质量
+      const quality = networkStats.quality || "unknown";
+      overallQualitySpan.textContent = getQualityText(quality);
+      qualityIndicator.className = `quality-indicator ${quality}`;
+
+      // 更新带宽
+      const bandwidth = networkStats.bandwidth || 0;
+      bandwidthSpan.textContent = `${(bandwidth / 1000).toFixed(2)} Kbps`;
+      bandwidthSpan.parentElement.className = `stat-item ${getBandwidthClass(bandwidth)}`;
+
+      // 更新丢包率
+      const packetLoss = networkStats.packetLoss || 0;
+      packetLossSpan.textContent = `${packetLoss.toFixed(2)}%`;
+      packetLossSpan.parentElement.className = `stat-item ${getPacketLossClass(packetLoss)}`;
+
+      // 更新 RTT
+      const rtt = networkStats.rtt || 0;
+      rttSpan.textContent = `${rtt.toFixed(0)} ms`;
+      rttSpan.parentElement.className = `stat-item ${getRTTClass(rtt)}`;
+
+      // 更新连接状态
+      connectionStateSpan.textContent = client.getConnectionState();
+      iceConnectionStateSpan.textContent = client.getICEConnectionState();
+
+      // 更新统计信息
+      messagesSentSpan.textContent = stats.messagesSent || 0;
+      messagesReceivedSpan.textContent = stats.messagesReceived || 0;
+      errorsSpan.textContent = stats.errors || 0;
+      reconnectionsSpan.textContent = stats.reconnections || 0;
+
+      // 更新带宽趋势图
+      bandwidthHistory.push(bandwidth);
+      if (bandwidthHistory.length > 30) {
+        bandwidthHistory.shift();
+      }
+      updateBandwidthChart();
+    }
+
+    /**
+     * 获取质量文本
+     */
+    function getQualityText(quality) {
+      const qualityMap = {
+        excellent: "优秀",
+        good: "良好",
+        fair: "一般",
+        poor: "较差",
+      };
+      return qualityMap[quality] || "未知";
+    }
+
+    /**
+     * 获取带宽等级
+     */
+    function getBandwidthClass(bandwidth) {
+      if (bandwidth >= 1000000) return "good"; // >= 1 Mbps
+      if (bandwidth >= 500000) return "warning"; // >= 500 Kbps
+      return "bad";
+    }
+
+    /**
+     * 获取丢包率等级
+     */
+    function getPacketLossClass(packetLoss) {
+      if (packetLoss < 1) return "good";
+      if (packetLoss < 5) return "warning";
+      return "bad";
+    }
+
+    /**
+     * 获取 RTT 等级
+     */
+    function getRTTClass(rtt) {
+      if (rtt < 100) return "good";
+      if (rtt < 200) return "warning";
+      return "bad";
+    }
+
+    /**
+     * 更新带宽趋势图
+     */
+    function updateBandwidthChart() {
+      bandwidthChart.innerHTML = "";
+
+      if (bandwidthHistory.length === 0) {
+        return;
+      }
+
+      const maxBandwidth = Math.max(...bandwidthHistory, 1000000); // 至少 1 Mbps
+      const chartWidth = bandwidthChart.offsetWidth;
+      const chartHeight = bandwidthChart.offsetHeight;
+      const barWidth = chartWidth / 30;
+
+      bandwidthHistory.forEach((value, index) => {
+        const height = (value / maxBandwidth) * chartHeight;
+        const bar = document.createElement("div");
+        bar.className = "chart-line";
+        bar.style.left = `${index * barWidth}px`;
+        bar.style.height = `${height}px`;
+        bandwidthChart.appendChild(bar);
+      });
+    }
+
+    /**
+     * 连接按钮事件
+     */
+    connectBtn.addEventListener("click", async () => {
+      try {
+        const signalingUrl = signalingUrlInput.value;
+        updateStatus("正在连接...");
+
+        client = new RTCClient({
+          signalingUrl,
+          autoConnect: true,
+          enableQualityAdaptation: true, // 启用质量自适应
+        });
+
+        // 监听连接状态
+        client.on("connection-state-change", (state) => {
+          updateStatus(`连接状态: ${state}`);
+          updateButtons(state === "connected", false);
+          updateNetworkStats();
+        });
+
+        // 监听 ICE 连接状态
+        client.on("ice-connection-state-change", (state) => {
+          updateStatus(`ICE 连接状态: ${state}`);
+          updateNetworkStats();
+        });
+
+        // 监听媒体流
+        client.on("stream", (stream) => {
+          const localStream = client.getLocalStream();
+          if (stream.id === localStream?.id) {
+            localVideo.srcObject = stream;
+            updateStatus("本地媒体流已设置");
+          } else {
+            remoteVideo.srcObject = stream;
+            updateStatus("远程媒体流已设置");
+          }
+        });
+
+        // 监听错误
+        client.on("error", (error) => {
+          updateStatus(`错误: ${error.message}`);
+          console.error("WebRTC 错误:", error);
+          updateNetworkStats();
+        });
+
+        updateStatus("客户端已创建，等待连接...");
+      } catch (error) {
+        updateStatus(`连接失败: ${error.message}`);
+        console.error("连接错误:", error);
+      }
+    });
+
+    /**
+     * 加入房间按钮事件
+     */
+    joinRoomBtn.addEventListener("click", async () => {
+      try {
+        const roomId = roomIdInput.value;
+        let userId = userIdInput.value;
+
+        // 如果用户ID为空，生成一个随机ID
+        if (!userId || userId === "user-") {
+          userId = `user-${Math.random().toString(36).substr(2, 9)}`;
+          userIdInput.value = userId;
+        }
+
+        updateStatus(`正在加入房间 ${roomId}...`);
+
+        // 获取本地媒体流
+        await client.getUserMedia({ video: true, audio: true });
+
+        // 加入房间
+        await client.joinRoom(roomId, userId);
+        updateStatus(`已加入房间 ${roomId}，用户ID: ${userId}`);
+        updateButtons(true, true);
+
+        // 开始定期更新统计信息
+        statsInterval = setInterval(() => {
+          updateNetworkStats();
+        }, 1000); // 每秒更新一次
+
+        // 立即更新一次
+        updateNetworkStats();
+      } catch (error) {
+        updateStatus(`加入房间失败: ${error.message}`);
+        console.error("加入房间错误:", error);
+      }
+    });
+
+    /**
+     * 离开房间按钮事件
+     */
+    leaveRoomBtn.addEventListener("click", async () => {
+      try {
+        // 停止统计更新
+        if (statsInterval) {
+          clearInterval(statsInterval);
+          statsInterval = null;
+        }
+
+        await client.leaveRoom();
+        updateStatus("已离开房间");
+        updateButtons(true, false);
+
+        // 清空统计显示
+        bandwidthHistory.length = 0;
+        updateBandwidthChart();
+      } catch (error) {
+        updateStatus(`离开房间失败: ${error.message}`);
+        console.error("离开房间错误:", error);
+      }
+    });
+
+    /**
+     * 断开连接按钮事件
+     */
+    disconnectBtn.addEventListener("click", async () => {
+      try {
+        // 停止统计更新
+        if (statsInterval) {
+          clearInterval(statsInterval);
+          statsInterval = null;
+        }
+
+        await client.disconnect();
+        updateStatus("已断开连接");
+        updateButtons(false, false);
+        localVideo.srcObject = null;
+        remoteVideo.srcObject = null;
+        client = null;
+
+        // 清空统计显示
+        bandwidthHistory.length = 0;
+        updateBandwidthChart();
+      } catch (error) {
+        updateStatus(`断开连接失败: ${error.message}`);
+        console.error("断开连接错误:", error);
+      }
+    });
+
+    // 初始化按钮状态
+    updateButtons(false, false);
+  </script>
+</body>
+</html>

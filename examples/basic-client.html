@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebRTC 客户端示例</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-top: 20px;
+    }
+    video {
+      width: 100%;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      background: #000;
+    }
+    .controls {
+      margin-top: 20px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      background: #007bff;
+      color: white;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    input {
+      padding: 8px;
+      font-size: 14px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    .status {
+      margin-top: 10px;
+      padding: 10px;
+      background: #f0f0f0;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <h1>WebRTC 客户端示例</h1>
+
+  <div>
+    <label>
+      信令服务器 URL:
+      <input type="text" id="signalingUrl" value="http://localhost:3000" style="width: 300px;">
+    </label>
+    <label style="margin-left: 20px;">
+      房间 ID:
+      <input type="text" id="roomId" value="room-123" style="width: 200px;">
+    </label>
+    <label style="margin-left: 20px;">
+      用户 ID:
+      <input type="text" id="userId" value="user-456" style="width: 200px;">
+    </label>
+  </div>
+
+  <div class="controls">
+    <button id="connectBtn">连接</button>
+    <button id="joinRoomBtn" disabled>加入房间</button>
+    <button id="leaveRoomBtn" disabled>离开房间</button>
+    <button id="disconnectBtn" disabled>断开连接</button>
+  </div>
+
+  <div class="status" id="status">未连接</div>
+
+  <div class="container">
+    <div>
+      <h2>本地视频</h2>
+      <video id="localVideo" autoplay muted playsinline></video>
+    </div>
+    <div>
+      <h2>远程视频</h2>
+      <video id="remoteVideo" autoplay playsinline></video>
+    </div>
+  </div>
+
+  <script type="module">
+    // 使用 esm.sh 提供的 npm 镜像（浏览器环境）
+    import { RTCClient } from "https://esm.sh/@jsr/dreamer__webrtc@1.0.0-beta.1/es2022/client.bundle.mjs";
+
+    const signalingUrlInput = document.getElementById("signalingUrl");
+    const roomIdInput = document.getElementById("roomId");
+    const userIdInput = document.getElementById("userId");
+    const connectBtn = document.getElementById("connectBtn");
+    const joinRoomBtn = document.getElementById("joinRoomBtn");
+    const leaveRoomBtn = document.getElementById("leaveRoomBtn");
+    const disconnectBtn = document.getElementById("disconnectBtn");
+    const statusDiv = document.getElementById("status");
+    const localVideo = document.getElementById("localVideo");
+    const remoteVideo = document.getElementById("remoteVideo");
+
+    let client = null;
+
+    function updateStatus(message) {
+      statusDiv.textContent = message;
+      console.log(message);
+    }
+
+    function updateButtons(connected, inRoom) {
+      connectBtn.disabled = connected;
+      joinRoomBtn.disabled = !connected || inRoom;
+      leaveRoomBtn.disabled = !inRoom;
+      disconnectBtn.disabled = !connected;
+    }
+
+    connectBtn.addEventListener("click", async () => {
+      try {
+        const signalingUrl = signalingUrlInput.value;
+        updateStatus("正在连接...");
+
+        client = new RTCClient({
+          signalingUrl,
+          autoConnect: true,
+        });
+
+        // 监听连接状态
+        client.on("connection-state-change", (state) => {
+          updateStatus(`连接状态: ${state}`);
+          updateButtons(state === "connected", false);
+        });
+
+        // 监听 ICE 连接状态
+        client.on("ice-connection-state-change", (state) => {
+          updateStatus(`ICE 连接状态: ${state}`);
+        });
+
+        // 监听媒体流
+        client.on("stream", (stream) => {
+          if (stream.id === client.getLocalStream()?.id) {
+            localVideo.srcObject = stream;
+            updateStatus("本地媒体流已设置");
+          } else {
+            remoteVideo.srcObject = stream;
+            updateStatus("远程媒体流已设置");
+          }
+        });
+
+        // 监听错误
+        client.on("error", (error) => {
+          updateStatus(`错误: ${error.message}`);
+          console.error("WebRTC 错误:", error);
+        });
+
+        updateStatus("客户端已创建，等待连接...");
+      } catch (error) {
+        updateStatus(`连接失败: ${error.message}`);
+        console.error("连接错误:", error);
+      }
+    });
+
+    joinRoomBtn.addEventListener("click", async () => {
+      try {
+        const roomId = roomIdInput.value;
+        const userId = userIdInput.value;
+        updateStatus(`正在加入房间 ${roomId}...`);
+        await client.joinRoom(roomId, userId);
+        updateStatus(`已加入房间 ${roomId}`);
+        updateButtons(true, true);
+      } catch (error) {
+        updateStatus(`加入房间失败: ${error.message}`);
+        console.error("加入房间错误:", error);
+      }
+    });
+
+    leaveRoomBtn.addEventListener("click", async () => {
+      try {
+        await client.leaveRoom();
+        updateStatus("已离开房间");
+        updateButtons(true, false);
+      } catch (error) {
+        updateStatus(`离开房间失败: ${error.message}`);
+        console.error("离开房间错误:", error);
+      }
+    });
+
+    disconnectBtn.addEventListener("click", async () => {
+      try {
+        await client.disconnect();
+        updateStatus("已断开连接");
+        updateButtons(false, false);
+        localVideo.srcObject = null;
+        remoteVideo.srcObject = null;
+        client = null;
+      } catch (error) {
+        updateStatus(`断开连接失败: ${error.message}`);
+        console.error("断开连接错误:", error);
+      }
+    });
+
+    // 初始化按钮状态
+    updateButtons(false, false);
+  </script>
+</body>
+</html>
