@@ -5,8 +5,8 @@
 
 import { RUNTIME } from "@dreamer/runtime-adapter";
 import {
-  afterAll,
-  beforeAll,
+  afterEach,
+  beforeEach,
   describe,
   expect,
   it,
@@ -60,8 +60,8 @@ const browserConfig = {
 };
 
 describe(`WebRTC - 浏览器测试 (${RUNTIME})`, () => {
-  // 在所有测试前启动信令服务器
-  beforeAll(async () => {
+  // 在每个测试前启动信令服务器
+  beforeEach(async () => {
     testPort = getAvailablePort();
     serverUrl = `http://localhost:${testPort}`;
     server = new SignalingServer({
@@ -73,8 +73,10 @@ describe(`WebRTC - 浏览器测试 (${RUNTIME})`, () => {
     console.log(`[${RUNTIME}] 信令服务器已启动: ${serverUrl}`);
   });
 
-  // 在所有测试后关闭信令服务器
-  afterAll(async () => {
+  // 在每个测试后关闭信令服务器
+  afterEach(async () => {
+    // 等待所有异步操作完成
+    await delay(300);
     if (server) {
       await server.close();
       // 等待端口完全释放，确保后续测试可以正常启动
