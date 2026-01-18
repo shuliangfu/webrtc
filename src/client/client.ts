@@ -12,232 +12,27 @@ import type {
   EventCallback,
   ICEConnectionState,
   ICEServer,
-  MediaStreamConstraints,
   RTCClientOptions,
   RTCConfiguration,
   RTCEvent,
   SignalingMessage,
 } from "../types.ts";
+import { logger } from "./logger.ts";
 import { SFUAdapter } from "./sfu-adapter.ts";
-
-/**
- * WebRTC 浏览器类型声明
- * 这些类型在浏览器环境中可用，但需要声明以便 TypeScript 识别
- */
-declare global {
-  interface RTCPeerConnection {
-    addTrack(track: MediaStreamTrack, stream: MediaStream): RTCRtpSender;
-    setLocalDescription(description: RTCSessionDescriptionInit): Promise<void>;
-    setRemoteDescription(description: RTCSessionDescriptionInit): Promise<void>;
-    createOffer(options?: RTCOfferOptions): Promise<RTCSessionDescriptionInit>;
-    createAnswer(
-      options?: RTCAnswerOptions,
-    ): Promise<RTCSessionDescriptionInit>;
-    addIceCandidate(
-      candidate: RTCIceCandidateInit | RTCIceCandidate,
-    ): Promise<void>;
-    createDataChannel(
-      label: string,
-      options?: RTCDataChannelInit,
-    ): RTCDataChannel;
-    getStats(): Promise<RTCStatsReport>;
-    onicecandidate: ((event: RTCPeerConnectionIceEvent) => void) | null;
-    oniceconnectionstatechange: (() => void) | null;
-    onconnectionstatechange: (() => void) | null;
-    ontrack: ((event: RTCTrackEvent) => void) | null;
-    ondatachannel: ((event: RTCDataChannelEvent) => void) | null;
-    iceConnectionState: string;
-    connectionState: string;
-    signalingState: string;
-    localDescription: RTCSessionDescriptionInit | null;
-    remoteDescription: RTCSessionDescriptionInit | null;
-    close(): void;
-  }
-
-  interface RTCPeerConnectionConstructor {
-    new (configuration?: RTCConfiguration): RTCPeerConnection;
-  }
-
-  var RTCPeerConnection: RTCPeerConnectionConstructor;
-
-  interface MediaStream {
-    getTracks(): MediaStreamTrack[];
-    getAudioTracks(): MediaStreamTrack[];
-    getVideoTracks(): MediaStreamTrack[];
-    addTrack(track: MediaStreamTrack): void;
-    removeTrack(track: MediaStreamTrack): void;
-  }
-
-  interface MediaStreamConstructor {
-    new (tracks?: MediaStreamTrack[]): MediaStream;
-  }
-
-  var MediaStream: MediaStreamConstructor;
-
-  interface MediaStreamTrack {
-    stop(): void;
-    kind: string;
-    id: string;
-    enabled: boolean;
-    muted: boolean;
-    readyState: string;
-    applyConstraints(constraints: MediaTrackConstraints): Promise<void>;
-    getConstraints(): MediaTrackConstraints;
-    getSettings(): MediaTrackSettings;
-  }
-
-  interface MediaTrackSettings {
-    width?: number;
-    height?: number;
-    frameRate?: number;
-    [key: string]: unknown;
-  }
-
-  interface MediaTrackConstraints {
-    width?: number | { ideal?: number; min?: number; max?: number };
-    height?: number | { ideal?: number; min?: number; max?: number };
-    frameRate?: number | { ideal?: number; min?: number; max?: number };
-    sampleRate?: number;
-    channelCount?: number;
-    echoCancellation?: boolean;
-    noiseSuppression?: boolean;
-    autoGainControl?: boolean;
-  }
-
-  interface MediaStreamConstraints {
-    audio?: boolean | MediaTrackConstraints;
-    video?: boolean | MediaTrackConstraints;
-  }
-
-  interface Navigator {
-    mediaDevices: MediaDevices;
-  }
-
-  interface MediaDevices {
-    getUserMedia(constraints: MediaStreamConstraints): Promise<MediaStream>;
-    getDisplayMedia(constraints: MediaStreamConstraints): Promise<MediaStream>;
-  }
-
-  interface RTCSessionDescriptionInit {
-    type: "offer" | "answer" | "pranswer" | "rollback";
-    sdp?: string;
-  }
-
-  interface RTCSessionDescription {
-    type: "offer" | "answer" | "pranswer" | "rollback";
-    sdp: string;
-  }
-
-  interface RTCSessionDescriptionConstructor {
-    new (descriptionInitDict: RTCSessionDescriptionInit): RTCSessionDescription;
-  }
-
-  var RTCSessionDescription: RTCSessionDescriptionConstructor;
-
-  interface RTCIceCandidateInit {
-    candidate?: string;
-    sdpMLineIndex?: number | null;
-    sdpMid?: string | null;
-    usernameFragment?: string | null;
-  }
-
-  interface RTCIceCandidate {
-    candidate: string;
-    sdpMLineIndex: number | null;
-    sdpMid: string | null;
-    usernameFragment: string | null;
-  }
-
-  interface RTCIceCandidateConstructor {
-    new (candidateInitDict?: RTCIceCandidateInit): RTCIceCandidate;
-  }
-
-  var RTCIceCandidate: RTCIceCandidateConstructor;
-
-  interface RTCPeerConnectionIceEvent {
-    candidate: RTCIceCandidate | null;
-  }
-
-  interface RTCTrackEvent {
-    track: MediaStreamTrack;
-    streams: MediaStream[];
-  }
-
-  interface RTCDataChannel {
-    send(data: string | ArrayBuffer | ArrayBufferView): void;
-    close(): void;
-    label: string;
-    readyState: string;
-    onopen: ((event: Event) => void) | null;
-    onclose: ((event: Event) => void) | null;
-    onmessage: ((event: MessageEvent) => void) | null;
-    onerror: ((event: Event) => void) | null;
-  }
-
-  interface RTCDataChannelInit {
-    ordered?: boolean;
-    maxPacketLifeTime?: number;
-    maxRetransmits?: number;
-    protocol?: string;
-    negotiated?: boolean;
-    id?: number;
-  }
-
-  interface RTCStatsReport {
-    values(): IterableIterator<RTCStats>;
-    forEach(callback: (value: RTCStats, key: string) => void): void;
-    get(key: string): RTCStats | undefined;
-    has(key: string): boolean;
-    entries(): IterableIterator<[string, RTCStats]>;
-    keys(): IterableIterator<string>;
-  }
-
-  interface RTCStats {
-    type: string;
-    id: string;
-    timestamp: number;
-    [key: string]: unknown;
-  }
-
-  interface RTCDataChannelEvent {
-    channel: RTCDataChannel;
-  }
-
-  interface RTCRtpSender {
-    track: MediaStreamTrack | null;
-  }
-
-  interface RTCOfferOptions {
-    offerToReceiveAudio?: boolean;
-    offerToReceiveVideo?: boolean;
-  }
-
-  interface RTCAnswerOptions {
-    // RTCAnswerOptions 目前没有标准选项
-    [key: string]: unknown;
-  }
-
-  interface RTCConfiguration {
-    iceServers?: ICEServer[];
-    iceTransportPolicy?: "all" | "relay";
-    bundlePolicy?: "balanced" | "max-compat" | "max-bundle";
-    rtcpMuxPolicy?: "negotiate" | "require";
-    peerIdentity?: string;
-    certificates?: RTCCertificate[];
-  }
-
-  interface ICEServer {
-    urls: string | string[];
-    username?: string;
-    credential?: string;
-  }
-
-  interface RTCCertificate {
-    // RTCCertificate 接口定义
-    expires: number;
-    [key: string]: unknown;
-  }
-}
+import type {
+  MediaStream,
+  MediaStreamConstraints,
+  RTCDataChannel,
+  RTCDataChannelInit,
+  RTCIceCandidate,
+  RTCPeerConnection,
+} from "./types.ts";
+import {
+  MediaStream as MediaStreamConstructor,
+  navigator,
+  RTCIceCandidate as RTCIceCandidateConstructor,
+  RTCSessionDescription as RTCSessionDescriptionConstructor,
+} from "./types.ts";
 
 /**
  * WebRTC 客户端
@@ -413,7 +208,7 @@ export class RTCClient {
   private setupSignalingHandlers(): void {
     // 连接成功
     this.socket.on("connect", () => {
-      console.log("[RTCClient] 信令服务器连接成功");
+      logger.info("信令服务器连接成功");
       this.setConnectionState("connected");
     });
 
@@ -435,7 +230,7 @@ export class RTCClient {
     this.socket.on(
       "user-joined",
       (data: { userId: string; roomId: string }) => {
-        console.log(`[RTCClient] 用户 ${data.userId} 加入房间 ${data.roomId}`);
+        logger.info(`用户 ${data.userId} 加入房间 ${data.roomId}`);
         // 如果是新用户加入，且我们已经创建了 PeerConnection，需要创建 offer
         if (
           this.peerConnection && this.peerConnection.signalingState === "stable"
@@ -447,7 +242,7 @@ export class RTCClient {
 
     // 用户离开房间
     this.socket.on("user-left", (data: { userId: string; roomId: string }) => {
-      console.log(`[RTCClient] 用户 ${data.userId} 离开房间 ${data.roomId}`);
+      logger.info(`用户 ${data.userId} 离开房间 ${data.roomId}`);
 
       // 如果是多人房间模式，清理对应的 PeerConnection
       if (this.multiPeerMode) {
@@ -459,8 +254,8 @@ export class RTCClient {
     this.socket.on(
       "room-joined",
       (data: { roomId: string; userId: string; users: string[] }) => {
-        console.log(
-          `[RTCClient] 加入房间成功: ${data.roomId}, 房间内用户: ${data.users.length}`,
+        logger.info(
+          `加入房间成功: ${data.roomId}, 房间内用户: ${data.users.length}`,
         );
         this.roomId = data.roomId;
         this.userId = data.userId;
@@ -513,7 +308,7 @@ export class RTCClient {
 
     // 连接断开
     this.socket.on("disconnect", (reason: string) => {
-      console.log(`[RTCClient] 信令服务器断开: ${reason}`);
+      logger.info(`信令服务器断开: ${reason}`);
       this.setConnectionState("disconnected");
       this.stats.reconnections++;
     });
@@ -521,7 +316,7 @@ export class RTCClient {
     // 连接错误
     this.socket.on("error", (error: Error) => {
       this.stats.errors++;
-      console.error("[RTCClient] 信令服务器错误:", error);
+      logger.error("信令服务器错误", undefined, error);
       this.emit("error", error);
     });
   }
@@ -532,7 +327,7 @@ export class RTCClient {
   private updateRTCConfiguration(): void {
     if (this.peerConnection) {
       // 注意：RTCPeerConnection 创建后不能修改配置，需要重新创建
-      console.warn("[RTCClient] RTCPeerConnection 已创建，无法更新配置");
+      logger.warn("RTCPeerConnection 已创建，无法更新配置");
     }
   }
 
@@ -579,7 +374,7 @@ export class RTCClient {
 
     // 停止本地媒体流
     if (this.localStream) {
-      this.localStream.getTracks().forEach((track) => track.stop());
+      this.localStream.getTracks().forEach((track: any) => track.stop());
       this.localStream = undefined;
     }
 
@@ -661,7 +456,7 @@ export class RTCClient {
 
     // 停止本地媒体流
     if (this.localStream) {
-      this.localStream.getTracks().forEach((track) => track.stop());
+      this.localStream.getTracks().forEach((track: any) => track.stop());
       this.localStream = undefined;
     }
 
@@ -714,8 +509,8 @@ export class RTCClient {
       return;
     }
 
-    console.log(
-      `[RTCClient] 切换架构模式: ${this.currentArchitectureMode} -> ${mode}`,
+    logger.info(
+      `切换架构模式: ${this.currentArchitectureMode} -> ${mode}`,
     );
 
     // 关闭当前模式的连接
@@ -805,14 +600,16 @@ export class RTCClient {
     };
 
     // 从连接池获取或创建 PeerConnection
-    this.peerConnection = this.connectionPool.acquire(rtcConfig);
+    this.peerConnection = this.connectionPool.acquire(
+      rtcConfig,
+    ) as RTCPeerConnection;
 
     // 设置事件处理器
     this.setupPeerConnectionHandlers();
 
     // 添加本地媒体流轨道
     if (this.localStream) {
-      this.localStream.getTracks().forEach((track) => {
+      this.localStream.getTracks().forEach((track: any) => {
         if (this.peerConnection) {
           this.peerConnection.addTrack(track, this.localStream!);
         }
@@ -841,7 +638,7 @@ export class RTCClient {
     if (!this.peerConnection) return;
 
     // ICE 候选（优化：批量收集后发送）
-    this.peerConnection.onicecandidate = (event) => {
+    this.peerConnection.onicecandidate = (event: any) => {
       if (event.candidate) {
         // 点对点模式：批量收集后发送
         this.collectIceCandidate("default", event.candidate);
@@ -866,19 +663,19 @@ export class RTCClient {
     };
 
     // 接收远程媒体流
-    this.peerConnection.ontrack = (event) => {
+    this.peerConnection.ontrack = (event: any) => {
       if (event.streams && event.streams.length > 0) {
         this.remoteStream = event.streams[0];
         this.emit("stream", this.remoteStream);
       } else if (event.track) {
         // 如果没有 stream，创建一个新的 stream
-        this.remoteStream = new MediaStream([event.track]);
+        this.remoteStream = new MediaStreamConstructor([event.track]);
         this.emit("stream", this.remoteStream);
       }
     };
 
     // 数据通道
-    this.peerConnection.ondatachannel = (event) => {
+    this.peerConnection.ondatachannel = (event: any) => {
       this.emit("data-channel", event.channel);
     };
   }
@@ -914,13 +711,13 @@ export class RTCClient {
     };
 
     try {
-      this.localStream = await navigator.mediaDevices.getUserMedia(
+      this.localStream = await (navigator as any).mediaDevices.getUserMedia(
         mediaConstraints,
       );
 
       // 将本地流添加到 PeerConnection
       if (this.peerConnection) {
-        this.localStream.getTracks().forEach((track) => {
+        this.localStream.getTracks().forEach((track: any) => {
           this.peerConnection!.addTrack(track, this.localStream!);
         });
       }
@@ -928,7 +725,7 @@ export class RTCClient {
       this.emit("stream", this.localStream);
       return this.localStream;
     } catch (error) {
-      console.error("[RTCClient] 获取用户媒体失败:", error);
+      logger.error("获取用户媒体失败", undefined, error);
       this.emit("error", error);
       throw error;
     }
@@ -954,15 +751,15 @@ export class RTCClient {
     };
 
     try {
-      const stream = await navigator.mediaDevices.getDisplayMedia(
+      const stream = await navigator.mediaDevices!.getDisplayMedia(
         mediaConstraints,
       );
 
       // 如果已有本地流，停止旧的视频轨道
       if (this.localStream) {
-        this.localStream.getVideoTracks().forEach((track) => track.stop());
+        this.localStream.getVideoTracks().forEach((track: any) => track.stop());
         // 添加新的视频轨道
-        stream.getVideoTracks().forEach((track) => {
+        stream.getVideoTracks().forEach((track: any) => {
           this.localStream!.addTrack(track);
           if (this.peerConnection) {
             this.peerConnection.addTrack(track, this.localStream!);
@@ -972,7 +769,7 @@ export class RTCClient {
         this.localStream = stream;
         // 将流添加到 PeerConnection
         if (this.peerConnection) {
-          this.localStream.getTracks().forEach((track) => {
+          this.localStream.getTracks().forEach((track: any) => {
             this.peerConnection!.addTrack(track, this.localStream!);
           });
         }
@@ -982,7 +779,7 @@ export class RTCClient {
       return this.localStream;
     } catch (error) {
       this.stats.errors++;
-      console.error("[RTCClient] 获取屏幕共享失败:", error);
+      logger.error("获取屏幕共享失败", undefined, error);
       this.emit("error", error);
       throw error;
     }
@@ -1011,7 +808,7 @@ export class RTCClient {
     options?: RTCDataChannelInit,
   ): RTCDataChannel | null {
     if (!this.peerConnection) {
-      console.warn("[RTCClient] PeerConnection 未初始化");
+      logger.warn("PeerConnection 未初始化");
       return null;
     }
 
@@ -1020,7 +817,7 @@ export class RTCClient {
       return channel;
     } catch (error) {
       this.stats.errors++;
-      console.error("[RTCClient] 创建数据通道失败:", error);
+      logger.error("创建数据通道失败", undefined, error);
       this.emit("error", error);
       return null;
     }
@@ -1036,7 +833,7 @@ export class RTCClient {
    */
   private async createOffer(): Promise<void> {
     if (!this.peerConnection) {
-      console.warn("[RTCClient] PeerConnection 未初始化");
+      logger.warn("PeerConnection 未初始化");
       return;
     }
 
@@ -1051,7 +848,7 @@ export class RTCClient {
       });
     } catch (error) {
       this.stats.errors++;
-      console.error("[RTCClient] 创建 Offer 失败:", error);
+      logger.error("创建 Offer 失败", undefined, error);
       this.emit("error", error);
 
       // 重试机制：如果失败，等待一段时间后重试
@@ -1064,7 +861,7 @@ export class RTCClient {
             this.peerConnection.signalingState === "stable"
           ) {
             this.createOffer().catch((err) => {
-              console.error("[RTCClient] Offer 重试失败:", err);
+              logger.error("Offer 重试失败", undefined, err);
             });
           }
         }, 1000);
@@ -1100,7 +897,7 @@ export class RTCClient {
       // 信令消息去重
       const messageId = this.getMessageId(message);
       if (this.processedSignalingIds.has(messageId)) {
-        console.debug(`[RTCClient] 重复消息已忽略: ${messageId}`);
+        logger.debug(`重复消息已忽略: ${messageId}`);
         return;
       }
       this.processedSignalingIds.add(messageId);
@@ -1115,8 +912,8 @@ export class RTCClient {
       if (this.multiPeerMode && message.from) {
         const pc = this.peerConnections.get(message.from);
         if (!pc) {
-          console.warn(
-            `[RTCClient] 未找到用户 ${message.from} 的 PeerConnection`,
+          logger.warn(
+            `未找到用户 ${message.from} 的 PeerConnection`,
           );
           return;
         }
@@ -1124,14 +921,14 @@ export class RTCClient {
       } else {
         // 点对点模式：使用单个 PeerConnection
         if (!this.peerConnection) {
-          console.warn("[RTCClient] PeerConnection 未初始化");
+          logger.warn("PeerConnection 未初始化");
           return;
         }
         await this.handleSignalingForPeer(this.peerConnection, message);
       }
     } catch (error) {
       this.stats.errors++;
-      console.error("[RTCClient] 处理信令消息失败:", error);
+      logger.error("处理信令消息失败", undefined, error);
       this.emit("error", error);
     }
   }
@@ -1173,7 +970,7 @@ export class RTCClient {
       case "offer":
         if (message.sdp) {
           await pc.setRemoteDescription(
-            new RTCSessionDescription(message.sdp),
+            new RTCSessionDescriptionConstructor(message.sdp),
           );
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
@@ -1191,11 +988,11 @@ export class RTCClient {
         if (message.sdp) {
           try {
             await pc.setRemoteDescription(
-              new RTCSessionDescription(message.sdp),
+              new RTCSessionDescriptionConstructor(message.sdp),
             );
           } catch (error) {
             this.stats.errors++;
-            console.error("[RTCClient] 处理 Answer 失败:", error);
+            logger.error("处理 Answer 失败", undefined, error);
             this.emit("error", error);
           }
         }
@@ -1205,12 +1002,13 @@ export class RTCClient {
         if (message.candidate) {
           try {
             await pc.addIceCandidate(
-              new RTCIceCandidate(message.candidate),
+              new RTCIceCandidateConstructor(message.candidate),
             );
           } catch (error) {
             // ICE candidate 错误通常可以忽略（可能是过期的 candidate）
-            console.debug(
-              "[RTCClient] 添加 ICE candidate 失败（可忽略）:",
+            logger.debug(
+              "添加 ICE candidate 失败（可忽略）",
+              undefined,
               error,
             );
           }
@@ -1218,7 +1016,7 @@ export class RTCClient {
         break;
 
       case "error":
-        console.error("[RTCClient] 信令错误:", message.error);
+        logger.error("信令错误", { error: message.error });
         this.emit("error", new Error(message.error || "未知错误"));
         break;
     }
@@ -1343,7 +1141,7 @@ export class RTCClient {
       try {
         callback(data);
       } catch (error) {
-        console.error(`[RTCClient] 事件处理器错误 (${event}):`, error);
+        logger.error(`事件处理器错误 (${event})`, undefined, error);
       }
     });
   }
@@ -1448,7 +1246,7 @@ export class RTCClient {
    */
   private createPeerConnectionForUser(userId: string): void {
     if (this.peerConnections.has(userId)) {
-      console.warn(`[RTCClient] 用户 ${userId} 的连接已存在`);
+      logger.warn(`用户 ${userId} 的连接已存在`);
       return;
     }
 
@@ -1471,7 +1269,7 @@ export class RTCClient {
 
     // 添加本地媒体流轨道
     if (this.localStream) {
-      this.localStream.getTracks().forEach((track) => {
+      this.localStream.getTracks().forEach((track: any) => {
         pc.addTrack(track, this.localStream!);
       });
     }
@@ -1492,7 +1290,7 @@ export class RTCClient {
     pc: RTCPeerConnection,
   ): void {
     // ICE 候选（批量收集）
-    pc.onicecandidate = (event) => {
+    pc.onicecandidate = (event: any) => {
       if (event.candidate) {
         this.collectIceCandidate(userId, event.candidate);
       }
@@ -1501,30 +1299,30 @@ export class RTCClient {
     // ICE 连接状态变化
     pc.oniceconnectionstatechange = () => {
       const state = pc.iceConnectionState as ICEConnectionState;
-      console.log(`[RTCClient] 用户 ${userId} ICE 连接状态: ${state}`);
+      logger.info(`用户 ${userId} ICE 连接状态: ${state}`);
     };
 
     // 连接状态变化
     pc.onconnectionstatechange = () => {
       const state = pc.connectionState as ConnectionState;
-      console.log(`[RTCClient] 用户 ${userId} 连接状态: ${state}`);
+      logger.info(`用户 ${userId} 连接状态: ${state}`);
     };
 
     // 接收远程媒体流
-    pc.ontrack = (event) => {
+    pc.ontrack = (event: any) => {
       if (event.streams && event.streams.length > 0) {
         const stream = event.streams[0];
         this.remoteStreams.set(userId, stream);
         this.emit("stream", { userId, stream });
       } else if (event.track) {
-        const stream = new MediaStream([event.track]);
+        const stream = new MediaStreamConstructor([event.track]);
         this.remoteStreams.set(userId, stream);
         this.emit("stream", { userId, stream });
       }
     };
 
     // 数据通道
-    pc.ondatachannel = (event) => {
+    pc.ondatachannel = (event: any) => {
       this.emit("data-channel", { userId, channel: event.channel });
     };
   }
@@ -1551,7 +1349,7 @@ export class RTCClient {
         to: userId,
       });
     } catch (error) {
-      console.error(`[RTCClient] 为用户 ${userId} 创建 Offer 失败:`, error);
+      logger.error(`为用户 ${userId} 创建 Offer 失败`, undefined, error);
       this.emit("error", error);
     }
   }
@@ -1719,7 +1517,7 @@ export class RTCClient {
       // 根据网络状况调整质量
       this.adjustMediaQuality();
     } catch (error) {
-      console.debug("[RTCClient] 获取网络统计信息失败:", error);
+      logger.debug("获取网络统计信息失败", undefined, error);
     }
   }
 
@@ -1813,12 +1611,12 @@ export class RTCClient {
         height: { ideal: constraints.height },
         frameRate: { ideal: constraints.frameRate },
       }).catch((error: unknown) => {
-        console.debug(`[RTCClient] 应用质量设置失败:`, error);
+        logger.debug("应用质量设置失败", undefined, error as Error);
       });
     }
 
-    console.log(
-      `[RTCClient] 媒体质量已调整为: ${quality} (${constraints.width}x${constraints.height}@${constraints.frameRate}fps)`,
+    logger.info(
+      `媒体质量已调整为: ${quality} (${constraints.width}x${constraints.height}@${constraints.frameRate}fps)`,
     );
   }
 
@@ -1906,15 +1704,17 @@ class RTCPeerConnectionPool {
 
     // 创建新连接（RTCPeerConnection 无法复用，必须创建新的）
     // 在 Deno 测试环境中，RTCPeerConnection 可能不可用
-    const RTCPeerConnectionConstructor = globalThis.RTCPeerConnection as
-      | RTCPeerConnectionConstructor
+    const RTCPeerConnectionCtor = (globalThis as any).RTCPeerConnection as
+      | {
+        new (configuration?: RTCConfiguration): RTCPeerConnection;
+      }
       | undefined;
-    if (!RTCPeerConnectionConstructor) {
+    if (!RTCPeerConnectionCtor) {
       throw new Error(
         "RTCPeerConnection is not available in this environment. This library requires a browser environment.",
       );
     }
-    const pc = new RTCPeerConnectionConstructor(cachedConfig);
+    const pc = new RTCPeerConnectionCtor(cachedConfig);
 
     this.activeConnections.add(pc);
     this.stats.created++;

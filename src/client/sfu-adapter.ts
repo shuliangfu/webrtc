@@ -12,6 +12,9 @@ import type {
   SFUOptions,
   SignalingMessage,
 } from "../types.ts";
+import { logger } from "./logger.ts";
+import type { MediaStream, RTCPeerConnection } from "./types.ts";
+import { RTCPeerConnection as RTCPeerConnectionConstructor } from "./types.ts";
 
 /**
  * SFU 适配器
@@ -87,7 +90,9 @@ export class SFUAdapter {
     }
 
     // 创建 RTCPeerConnection
-    this.peerConnection = new RTCPeerConnection(this.rtcConfiguration);
+    this.peerConnection = new RTCPeerConnectionConstructor(
+      this.rtcConfiguration,
+    ) as RTCPeerConnection;
 
     // 设置事件监听器
     this.setupPeerConnectionHandlers();
@@ -114,13 +119,13 @@ export class SFUAdapter {
 
     // 关闭所有远程流
     this.remoteStreams.forEach((stream) => {
-      stream.getTracks().forEach((track) => track.stop());
+      stream.getTracks().forEach((track: any) => track.stop());
     });
     this.remoteStreams.clear();
 
     // 关闭本地流
     if (this.localStream) {
-      this.localStream.getTracks().forEach((track) => track.stop());
+      this.localStream.getTracks().forEach((track: any) => track.stop());
       this.localStream = undefined;
     }
 
@@ -156,7 +161,7 @@ export class SFUAdapter {
     this.localStream = stream;
 
     // 将媒体流添加到 RTCPeerConnection
-    stream.getTracks().forEach((track) => {
+    stream.getTracks().forEach((track: any) => {
       this.peerConnection!.addTrack(track, stream);
     });
 
@@ -205,7 +210,7 @@ export class SFUAdapter {
         reject(new Error(`订阅用户 ${userId} 的流超时`));
       }, 10000);
 
-      const onTrack = (event: RTCTrackEvent) => {
+      const onTrack = (event: any) => {
         if (event.streams && event.streams.length > 0) {
           const stream = event.streams[0];
           this.remoteStreams.set(userId, stream);
@@ -236,7 +241,7 @@ export class SFUAdapter {
     // 停止远程流
     const stream = this.remoteStreams.get(userId);
     if (stream) {
-      stream.getTracks().forEach((track) => track.stop());
+      stream.getTracks().forEach((track: any) => track.stop());
       this.remoteStreams.delete(userId);
     }
 
@@ -333,7 +338,7 @@ export class SFUAdapter {
     }
 
     // ICE candidate 事件
-    this.peerConnection.onicecandidate = (event) => {
+    this.peerConnection.onicecandidate = (event: any) => {
       if (event.candidate && this.signalingHandler) {
         // 手动构建 candidate 对象（因为 RTCIceCandidate.toJSON() 可能不存在）
         // RTCIceCandidateInit 在全局作用域中定义
@@ -351,7 +356,7 @@ export class SFUAdapter {
     };
 
     // Track 事件（接收远程流）
-    this.peerConnection.ontrack = (event) => {
+    this.peerConnection.ontrack = (event: any) => {
       if (event.streams && event.streams.length > 0) {
         const stream = event.streams[0];
         this.emit("track", { stream, track: event.track });
@@ -413,7 +418,7 @@ export class SFUAdapter {
       try {
         callback(data);
       } catch (error) {
-        console.error(`[SFUAdapter] 事件处理器错误:`, error);
+        logger.error("事件处理器错误", undefined, error);
       }
     });
   }

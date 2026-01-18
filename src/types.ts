@@ -6,42 +6,58 @@
 
 /**
  * WebRTC 浏览器类型声明
- * 这些类型在浏览器环境中可用，但需要声明以便 TypeScript 识别
+ * 这些类型在浏览器环境中可用，定义为模块类型以兼容 JSR
+ * 注意：在浏览器环境中，这些类型由浏览器全局提供
  */
-declare global {
-  interface RTCCertificate {
-    expires: number;
-    getFingerprints(): RTCDtlsFingerprint[];
-  }
 
-  interface RTCDtlsFingerprint {
-    algorithm: string;
-    value: string;
-  }
+/**
+ * RTCCertificate 类型（浏览器环境）
+ */
+export interface RTCCertificate {
+  expires: number;
+  getFingerprints(): RTCDtlsFingerprint[];
+  [key: string]: unknown;
+}
 
-  interface RTCSessionDescriptionInit {
-    type: "offer" | "answer" | "pranswer" | "rollback";
-    sdp?: string;
-  }
+/**
+ * RTCDtlsFingerprint 类型
+ */
+export interface RTCDtlsFingerprint {
+  algorithm: string;
+  value: string;
+}
 
-  interface RTCIceCandidateInit {
-    candidate?: string;
-    sdpMLineIndex?: number | null;
-    sdpMid?: string | null;
-    usernameFragment?: string | null;
-  }
+/**
+ * RTCSessionDescriptionInit 类型
+ */
+export interface RTCSessionDescriptionInit {
+  type: "offer" | "answer" | "pranswer" | "rollback";
+  sdp?: string;
+}
 
-  interface MediaTrackConstraints {
-    width?: number | { ideal?: number; min?: number; max?: number };
-    height?: number | { ideal?: number; min?: number; max?: number };
-    frameRate?: number | { ideal?: number; min?: number; max?: number };
-    sampleRate?: number;
-    channelCount?: number;
-    echoCancellation?: boolean;
-    noiseSuppression?: boolean;
-    autoGainControl?: boolean;
-    [key: string]: unknown;
-  }
+/**
+ * RTCIceCandidateInit 类型
+ */
+export interface RTCIceCandidateInit {
+  candidate?: string;
+  sdpMLineIndex?: number | null;
+  sdpMid?: string | null;
+  usernameFragment?: string | null;
+}
+
+/**
+ * MediaTrackConstraints 类型
+ */
+export interface MediaTrackConstraints {
+  width?: number | { ideal?: number; min?: number; max?: number };
+  height?: number | { ideal?: number; min?: number; max?: number };
+  frameRate?: number | { ideal?: number; min?: number; max?: number };
+  sampleRate?: number;
+  channelCount?: number;
+  echoCancellation?: boolean;
+  noiseSuppression?: boolean;
+  autoGainControl?: boolean;
+  [key: string]: unknown;
 }
 
 /**
@@ -62,7 +78,7 @@ export interface RTCConfiguration {
   bundlePolicy?: "balanced" | "max-compat" | "max-bundle";
   rtcpMuxPolicy?: "negotiate" | "require";
   peerIdentity?: string;
-  certificates?: RTCCertificate[];
+  certificates?: RTCCertificate[] | any[];
 }
 
 /**
