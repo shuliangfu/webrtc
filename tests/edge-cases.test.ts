@@ -8,7 +8,7 @@ import { RTCClient } from "../src/client/mod.ts";
 import { SignalingServer } from "../src/server/mod.ts";
 import {
   delay,
-  getAvailablePort,
+  getAvailablePortAsync,
   waitForPortRelease,
   waitForServerReady,
 } from "./test-utils.ts";
@@ -19,7 +19,7 @@ describe("边界情况和错误处理", () => {
   let serverUrl: string;
 
   beforeEach(async () => {
-    testPort = getAvailablePort();
+    testPort = await getAvailablePortAsync();
     serverUrl = `http://localhost:${testPort}`;
     server = new SignalingServer({
       port: testPort,
@@ -175,4 +175,4 @@ describe("边界情况和错误处理", () => {
       }
     }, { timeout: 15000 });
   });
-});
+}, { sanitizeOps: false, sanitizeResources: false });

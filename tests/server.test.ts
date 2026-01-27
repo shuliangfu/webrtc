@@ -8,6 +8,7 @@ import { SignalingServer } from "../src/server/mod.ts";
 import {
   delay,
   getAvailablePort,
+  getAvailablePortAsync,
   waitForPortRelease,
   waitForServerReady,
 } from "./test-utils.ts";
@@ -16,8 +17,8 @@ describe("SignalingServer", () => {
   let server: SignalingServer;
   let testPort: number;
 
-  beforeEach(() => {
-    testPort = getAvailablePort();
+  beforeEach(async () => {
+    testPort = await getAvailablePortAsync();
     server = new SignalingServer({
       port: testPort,
       stunServers: [{ urls: "stun:stun.l.google.com:19302" }],

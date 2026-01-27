@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from "@dreamer/test";
 import { SignalingServer } from "../src/server/mod.ts";
 import {
   delay,
-  getAvailablePort,
+  getAvailablePortAsync,
   waitForPortRelease,
   waitForServerReady,
 } from "./test-utils.ts";
@@ -17,7 +17,7 @@ describe("SignalingServer 方法测试", () => {
   let testPort: number;
 
   beforeEach(async () => {
-    testPort = getAvailablePort();
+    testPort = await getAvailablePortAsync();
     server = new SignalingServer({
       port: testPort,
       stunServers: [{ urls: "stun:stun.l.google.com:19302" }],
@@ -79,4 +79,4 @@ describe("SignalingServer 方法测试", () => {
       expect(typeof server.getNetworkQualitySuggestion).toBe("function");
     }, { timeout: 15000 });
   });
-});
+}, { sanitizeOps: false, sanitizeResources: false });

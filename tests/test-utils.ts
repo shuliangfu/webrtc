@@ -1,24 +1,53 @@
 /**
  * @fileoverview 测试工具函数
- * 提供测试中常用的工具函数
+ * 提供测试中常用的工具函数，通过 @dreamer/runtime-adapter 兼容 Deno 与 Bun
  */
 
-import { detectRuntime, IS_BUN } from "@dreamer/runtime-adapter";
+import { IS_BUN, serve } from "@dreamer/runtime-adapter";
 
 /**
- * 测试使用的固定端口
- * 所有测试共享同一个端口，每个测试结束后会关闭服务器释放端口
+ * 测试使用的固定端口（供同步 getAvailablePort 递增使用）
  */
-const TEST_PORT = 30000;
+const TEST_PORT_BASE = 30000;
 
 /**
- * 获取测试端口
+ * 同步端口递增计数器，保证同一进程内每次调用得到不同端口，减少复用导致的 AddrInUse
+ */
+let _portCounter = 0;
+
+/**
+ * 获取测试端口（同步）
+ * 每次调用返回 30000、30001、30002…，用于仅需「任意端口号」、不立刻 bind 的场景（如构造配置）。
  *
- * @returns 测试端口号（固定端口）
+ * @returns 测试端口号
  */
 export function getAvailablePort(): number {
-  // 使用固定端口，每个测试结束后会关闭服务器释放端口
-  return TEST_PORT;
+  return TEST_PORT_BASE + (_portCounter++ % 1000);
+}
+
+/**
+ * 获取当前真正可用的端口（异步）
+ * 通过 @dreamer/runtime-adapter 的 serve({ port: 0 }) 在 Deno/Bun 下由系统分配空闲端口，
+ * 避免与其它进程或本进程其它测试冲突，解决 AddrInUse。在 beforeAll/beforeEach 中启动服务器时应用此函数。
+ *
+ * @returns 当前可用的端口号
+ */
+export async function getAvailablePortAsync(): Promise<number> {
+  let resolvePort: (p: number) => void;
+  const portPromise = new Promise<number>((r) => {
+    resolvePort = r;
+  });
+  const handle = serve(
+    {
+      port: 0,
+      host: "127.0.0.1",
+      onListen: (params) => resolvePort(params.port),
+    },
+    () => new Response(""),
+  );
+  const port = await portPromise;
+  await handle.shutdown();
+  return port;
 }
 
 /**
@@ -62,7 +91,7 @@ export async function waitForServerReady(serverUrl?: string): Promise<void> {
             await delay(100); // 额外等待确保 WebSocket 升级也准备好
             return;
           }
-        } catch (error) {
+        } catch (_error) {
           // 连接失败，继续重试
           await delay(100);
           retries--;
@@ -107,14 +136,14 @@ export async function waitForPortRelease(
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 200);
         try {
-          const response = await fetch(`http://localhost:${port}`, {
+          const _response = await fetch(`http://localhost:${port}`, {
             method: "GET",
             signal: controller.signal,
           });
           // 如果连接成功，说明端口仍被占用，继续等待
           await delay(100);
           retries--;
-        } catch (error) {
+        } catch (_error) {
           // 连接失败，说明端口可能已释放
           // 额外等待一段时间确保端口完全释放
           await delay(100);
@@ -123,7 +152,7 @@ export async function waitForPortRelease(
         } finally {
           clearTimeout(timeoutId);
         }
-      } catch (error) {
+      } catch (_error) {
         // 连接失败，说明端口可能已释放
         await delay(100);
         return;

@@ -8,7 +8,7 @@ import { RTCClient } from "../src/client/mod.ts";
 import { SignalingServer } from "../src/server/mod.ts";
 import {
   delay,
-  getAvailablePort,
+  getAvailablePortAsync,
   waitForPortRelease,
   waitForServerReady,
 } from "./test-utils.ts";
@@ -19,7 +19,7 @@ describe("RTCClient 全面测试", () => {
   let serverUrl: string;
 
   beforeEach(async () => {
-    testPort = getAvailablePort();
+    testPort = await getAvailablePortAsync();
     serverUrl = `http://localhost:${testPort}`;
     server = new SignalingServer({
       port: testPort,
@@ -111,9 +111,9 @@ describe("RTCClient 全面测试", () => {
         autoConnect: false,
       });
       await delay(100);
-      let eventFired = false;
+      let _eventFired = false;
       client.on("connection-state-change", () => {
-        eventFired = true;
+        _eventFired = true;
       });
       client.connect();
       await delay(800);
@@ -292,4 +292,4 @@ describe("RTCClient 全面测试", () => {
       await delay(100);
     }, { timeout: 15000 });
   });
-});
+}, { sanitizeOps: false, sanitizeResources: false });

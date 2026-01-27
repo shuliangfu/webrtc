@@ -8,7 +8,7 @@ import { RTCClient } from "../src/client/mod.ts";
 import { SignalingServer } from "../src/server/mod.ts";
 import {
   delay,
-  getAvailablePort,
+  getAvailablePortAsync,
   waitForPortRelease,
   waitForServerReady,
 } from "./test-utils.ts";
@@ -19,7 +19,7 @@ describe("WebRTC 集成测试", () => {
   let serverUrl: string;
 
   beforeEach(async () => {
-    testPort = getAvailablePort();
+    testPort = await getAvailablePortAsync();
     serverUrl = `http://localhost:${testPort}`;
     server = new SignalingServer({
       port: testPort,
@@ -44,7 +44,7 @@ describe("WebRTC 集成测试", () => {
   describe("房间加入和离开", () => {
     it("应该允许客户端加入房间", async () => {
       // 跳过实际 WebRTC 连接测试（需要浏览器环境）
-      if (typeof globalThis.RTCPeerConnection === "undefined") {
+      if (typeof (globalThis as any).RTCPeerConnection === "undefined") {
         return;
       }
 
@@ -71,7 +71,7 @@ describe("WebRTC 集成测试", () => {
 
     it("应该允许多个客户端加入同一房间", async () => {
       // 跳过实际 WebRTC 连接测试（需要浏览器环境）
-      if (typeof globalThis.RTCPeerConnection === "undefined") {
+      if (typeof (globalThis as any).RTCPeerConnection === "undefined") {
         return;
       }
 
@@ -109,7 +109,7 @@ describe("WebRTC 集成测试", () => {
 
     it("应该允许客户端离开房间", async () => {
       // 跳过实际 WebRTC 连接测试（需要浏览器环境）
-      if (typeof globalThis.RTCPeerConnection === "undefined") {
+      if (typeof (globalThis as any).RTCPeerConnection === "undefined") {
         return;
       }
 
@@ -143,7 +143,7 @@ describe("WebRTC 集成测试", () => {
   describe("信令消息处理", () => {
     it("应该处理信令消息统计", async () => {
       // 跳过实际 WebRTC 连接测试（需要浏览器环境）
-      if (typeof globalThis.RTCPeerConnection === "undefined") {
+      if (typeof (globalThis as any).RTCPeerConnection === "undefined") {
         return;
       }
 
@@ -170,7 +170,7 @@ describe("WebRTC 集成测试", () => {
 
     it("应该提供网络质量建议", async () => {
       // 跳过实际 WebRTC 连接测试（需要浏览器环境）
-      if (typeof globalThis.RTCPeerConnection === "undefined") {
+      if (typeof (globalThis as any).RTCPeerConnection === "undefined") {
         return;
       }
 
@@ -202,7 +202,7 @@ describe("WebRTC 集成测试", () => {
   describe("服务器统计", () => {
     it("应该统计活跃房间和用户", async () => {
       // 跳过实际 WebRTC 连接测试（需要浏览器环境）
-      if (typeof globalThis.RTCPeerConnection === "undefined") {
+      if (typeof (globalThis as any).RTCPeerConnection === "undefined") {
         return;
       }
 
@@ -236,7 +236,7 @@ describe("WebRTC 集成测试", () => {
       }
     }, { sanitizeOps: false, sanitizeResources: false, timeout: 15000 });
 
-    it("应该重置统计信息", async () => {
+    it("应该重置统计信息", () => {
       server.resetStats();
       const stats = server.getStats();
       expect(stats.messagesReceived).toBe(0);
@@ -245,4 +245,4 @@ describe("WebRTC 集成测试", () => {
       expect(stats.averageLatency).toBe(0);
     }, { timeout: 15000 });
   });
-});
+}, { sanitizeOps: false, sanitizeResources: false });

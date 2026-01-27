@@ -4,7 +4,7 @@
 
 [![JSR](https://jsr.io/badges/@dreamer/webrtc)](https://jsr.io/@dreamer/webrtc)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/tests-137%20passed-brightgreen)](./TEST_REPORT.md)
+[![Tests](https://img.shields.io/badge/tests-163%20passed-brightgreen)](./TEST_REPORT.md)
 
 ---
 
@@ -219,22 +219,23 @@ await client.joinRoom("room-123", "user-456");
 
 ## 📊 测试报告
 
-本库经过全面测试，所有 137 个测试用例均已通过，测试覆盖率达到 100%。详细测试报告请查看 [TEST_REPORT.md](./TEST_REPORT.md)。
+本库经过全面测试，所有 **163** 个测试用例均已通过，测试覆盖率达到 100%。详细测试报告请查看 [TEST_REPORT.md](./TEST_REPORT.md)。
 
-**测试统计**（2026-01-18 10:13:24）：
-- **总测试数**: 137
-- **通过**: 137 ✅
+**测试统计**（2026-01-27）：
+- **总测试数**: 163
+- **通过**: 163 ✅
 - **失败**: 0
 - **通过率**: 100% ✅
-- **测试执行时间**: ~2分34秒
-- **测试覆盖**: 所有公共 API、边界情况、错误处理、架构模式功能
+- **测试执行时间**: 2m37s
+- **测试覆盖**: 所有公共 API、边界情况、错误处理、架构模式功能、钩子生命周期
 - **测试环境**: Deno 2.6+, Bun 1.3.5
 
 **测试类型**：
-- ✅ 单元测试（74 个）
+- ✅ 客户端/服务端单元与全面测试（client、client-methods、client-comprehensive、server、server-methods、server-comprehensive）
 - ✅ 集成测试（7 个）
 - ✅ 边界情况和错误处理测试（11 个）
-- ✅ 浏览器测试（24 个，含架构模式测试）
+- ✅ 钩子函数执行测试（27 个，beforeAll/afterAll/beforeEach/afterEach）
+- ✅ 浏览器测试（含架构模式测试）
 - ✅ 架构模式测试（10 个，Mesh/SFU/Auto）
 
 **测试亮点**：
@@ -242,6 +243,7 @@ await client.joinRoom("room-123", "user-456");
 - ✅ 集成测试验证了端到端的完整流程
 - ✅ 浏览器测试验证了在真实浏览器环境中的功能
 - ✅ 架构模式测试验证了 Mesh、SFU 和自动切换功能的正确性
+- ✅ 钩子测试验证了测试框架生命周期的正确执行
 
 查看完整测试报告：[TEST_REPORT.md](./TEST_REPORT.md)
 
@@ -297,7 +299,7 @@ new RTCClient(options: RTCClientOptions)
 - `enableQualityAdaptation?: boolean`: 是否启用质量自适应（默认：true）
 
 **方法**：
-- `connect(): void`: 连接到信令服务器
+- `connect(): void`: 连接到信令服务器。若当前环境没有 `RTCPeerConnection`（如 Node/Bun 非浏览器），会立即将状态置为 `failed` 并返回；若信令在约定时间内未连上，会超时置为 `failed` 并断开，避免无限等待。
 - `disconnect(): void`: 断开连接
 - `joinRoom(roomId: string, userId?: string, multiPeer?: boolean): Promise<void>`: 加入房间（支持多人房间模式）
 - `leaveRoom(): void`: 离开房间
@@ -515,12 +517,7 @@ const client = new RTCClient({
 
 ## 📝 注意事项
 
-- **浏览器环境**：客户端代码需要在浏览器环境中运行
-- **HTTPS 要求**：在生产环境中，WebRTC 需要 HTTPS 连接（localhost 除外）
-- **STUN/TURN 服务器**：对于 NAT 穿透，建议配置 STUN 服务器；对于复杂网络环境，需要配置 TURN 服务器
-- **媒体权限**：浏览器会请求摄像头和麦克风权限
-
-- **浏览器环境**：客户端代码需要在浏览器环境中运行
+- **浏览器环境**：客户端代码需要在浏览器环境中运行。在 Node/Bun 等无 `RTCPeerConnection` 的环境下，`connect()` 会立即将状态置为 `failed`，不会发起信令连接，调用 `joinRoom` 等会因缺少 WebRTC 能力而失败。
 - **HTTPS 要求**：在生产环境中，WebRTC 需要 HTTPS 连接（localhost 除外）
 - **STUN/TURN 服务器**：对于 NAT 穿透，建议配置 STUN 服务器；对于复杂网络环境，需要配置 TURN 服务器
 - **媒体权限**：浏览器会请求摄像头和麦克风权限

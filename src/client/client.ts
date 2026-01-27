@@ -119,6 +119,10 @@ export class RTCClient {
   private userId?: string;
   /** ICE 服务器配置 */
   private iceServers: ICEServer[] = [];
+  /** 信令连接超时定时器 ID（用于在长时间未连接成功时主动失败，避免挂起） */
+  private connectTimeoutId?: number;
+  /** 信令连接超时时长（毫秒），超时后置为 failed 并断开，避免在无 WebRTC 或网络异常时无限等待 */
+  private static readonly CONNECT_TIMEOUT_MS = 10_000;
 
   /**
    * 创建 WebRTC 客户端实例
@@ -206,8 +210,12 @@ export class RTCClient {
    * @private
    */
   private setupSignalingHandlers(): void {
-    // 连接成功
+    // 连接成功：清除连接超时定时器，并更新状态
     this.socket.on("connect", () => {
+      if (this.connectTimeoutId != null) {
+        clearTimeout(this.connectTimeoutId);
+        this.connectTimeoutId = undefined;
+      }
       logger.info("信令服务器连接成功");
       this.setConnectionState("connected");
     });
@@ -335,6 +343,8 @@ export class RTCClient {
    * 连接信令服务器
    *
    * 手动连接到信令服务器。如果设置了 `autoConnect: true`，则会在创建客户端时自动连接。
+   * 若当前环境没有 RTCPeerConnection（如 Node/Bun 非浏览器），则立即置为 failed 并返回，避免后续
+   * joinRoom 等操作挂起。若信令在约定时间内未连接成功，则超时置为 failed 并断开，避免无限等待。
    *
    * @example
    * ```typescript
@@ -342,7 +352,27 @@ export class RTCClient {
    * ```
    */
   connect(): void {
+    // 环境不具备 WebRTC 时立即失败，避免后续 joinRoom 等调用挂起（如 Bun/Node 无 RTCPeerConnection）
+    const hasRTC = typeof (globalThis as { RTCPeerConnection?: unknown }).RTCPeerConnection !==
+      "undefined";
+    if (!hasRTC) {
+      this.setConnectionState("failed");
+      return;
+    }
+
     this.socket.connect();
+
+    // 信令连接超时：若在约定时间内未触发 "connect"，则置为 failed 并断开，避免无限挂起
+    if (this.connectTimeoutId != null) {
+      clearTimeout(this.connectTimeoutId);
+    }
+    this.connectTimeoutId = setTimeout(() => {
+      this.connectTimeoutId = undefined;
+      if (this.connectionState !== "connected") {
+        this.socket.disconnect();
+        this.setConnectionState("failed");
+      }
+    }, RTCClient.CONNECT_TIMEOUT_MS);
   }
 
   /**
@@ -356,6 +386,12 @@ export class RTCClient {
    * ```
    */
   disconnect(): void {
+    // 清除信令连接超时定时器，避免断开后仍触发超时逻辑
+    if (this.connectTimeoutId != null) {
+      clearTimeout(this.connectTimeoutId);
+      this.connectTimeoutId = undefined;
+    }
+
     // 关闭所有 PeerConnection 并归还到连接池
     if (this.multiPeerMode) {
       // 多人房间模式：关闭所有对等体连接

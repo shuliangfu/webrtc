@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from "@dreamer/test";
 import { RTCClient } from "../src/client/mod.ts";
 import {
   delay,
-  getAvailablePort,
+  getAvailablePortAsync,
   waitForPortRelease,
   waitForServerReady,
 } from "./test-utils.ts";
@@ -19,7 +19,7 @@ describe("RTCClient 方法测试", () => {
   let serverUrl: string;
 
   beforeEach(async () => {
-    testPort = getAvailablePort();
+    testPort = await getAvailablePortAsync();
     serverUrl = `http://localhost:${testPort}`;
     server = new SignalingServer({
       port: testPort,

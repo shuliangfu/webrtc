@@ -2,10 +2,10 @@
 
 ## 测试概览
 
-- **测试库版本**: @dreamer/test@^1.0.0-beta.13
-- **运行时适配器版本**: @dreamer/runtime-adapter@1.0.0-beta.17
+- **测试库版本**: @dreamer/test@1.0.0-beta.37
+- **运行时适配器版本**: @dreamer/runtime-adapter@1.0.0-beta.19
 - **测试框架**: @dreamer/test (兼容 Deno 和 Bun)
-- **测试时间**: 2026-01-18 10:13:24
+- **测试时间**: 2026-01-27
 - **测试环境**:
   - Deno 2.6+
   - Bun 1.3.5
@@ -14,26 +14,29 @@
 
 ### 总体统计
 
-- **总测试数**: 137
-- **通过**: 137 ✅
+- **总测试数**: 163
+- **通过**: 163 ✅
 - **失败**: 0
 - **通过率**: 100% ✅
-- **测试执行时间**: ~2分34秒（Deno 环境）
+- **测试执行时间**: 2m37s
 
 ### 测试文件统计
 
 | 测试文件 | 测试数 | 状态 | 说明 |
 |---------|--------|------|------|
-| `client.test.ts` | 18 | ✅ 全部通过 | RTCClient 基础功能测试 |
-| `client-methods.test.ts` | 17 | ✅ 全部通过 | RTCClient 方法测试 |
-| `client-comprehensive.test.ts` | 15 | ✅ 全部通过 | RTCClient 全面测试 |
-| `server.test.ts` | 15 | ✅ 全部通过 | SignalingServer 基础功能测试 |
-| `server-methods.test.ts` | 9 | ✅ 全部通过 | SignalingServer 方法测试 |
-| `server-comprehensive.test.ts` | 11 | ✅ 全部通过 | SignalingServer 全面测试 |
-| `integration.test.ts` | 7 | ✅ 全部通过 | 客户端和服务端集成测试 |
-| `edge-cases.test.ts` | 11 | ✅ 全部通过 | 边界情况和错误处理测试 |
-| `browser-puppeteer.test.ts` | 24 | ✅ 全部通过 | 浏览器端 Puppeteer 测试（含架构模式测试） |
 | `architecture-mode.test.ts` | 10 | ✅ 全部通过 | 架构模式测试（Mesh/SFU/Auto） |
+| `browser-puppeteer.test.ts` | 23 | ✅ 全部通过 | 浏览器端 Puppeteer 测试（含架构模式测试） |
+| `client-comprehensive.test.ts` | 15 | ✅ 全部通过 | RTCClient 全面测试（质量自适应、事件系统、状态管理等） |
+| `client-methods.test.ts` | 17 | ✅ 全部通过 | RTCClient 方法测试 |
+| `client.test.ts` | 18 | ✅ 全部通过 | RTCClient 基础功能测试 |
+| `edge-cases.test.ts` | 11 | ✅ 全部通过 | 边界情况和错误处理测试 |
+| `hooks-execution.test.ts` | 27 | ✅ 全部通过 | 钩子函数执行测试（beforeAll/afterAll/beforeEach/afterEach） |
+| `integration.test.ts` | 7 | ✅ 全部通过 | 客户端和服务端集成测试 |
+| `server-comprehensive.test.ts` | 11 | ✅ 全部通过 | SignalingServer 全面测试 |
+| `server-methods.test.ts` | 9 | ✅ 全部通过 | SignalingServer 方法测试 |
+| `server.test.ts` | 15 | ✅ 全部通过 | SignalingServer 基础功能测试 |
+
+*注：上表测试数合计 163，与本次运行「163 passed」一致。*
 
 ## 功能测试详情
 
@@ -236,6 +239,24 @@
 - ✅ 资源泄漏防护
 - ✅ 异常场景恢复
 
+### 钩子函数执行测试 (hooks-execution.test.ts) - 27 个测试
+
+**测试场景**:
+- ✅ beforeAll 应在第一个测试前执行、只执行一次、在所有测试前执行
+- ✅ afterAll 在所有测试后执行
+- ✅ beforeEach 应在每个测试前执行
+- ✅ afterEach 应在每个测试后执行
+- ✅ 钩子函数组合（beforeAll/afterAll/beforeEach/afterEach）执行顺序
+- ✅ 异步 beforeAll/afterAll 正常执行
+- ✅ 嵌套套件的钩子执行顺序（父套件/子套件 afterAll）
+- ✅ beforeEach/afterEach 接收 TestContext
+
+**测试结果**: 27 个测试全部通过
+
+**实现特点**:
+- ✅ 验证 @dreamer/test 的 beforeAll/afterAll/beforeEach/afterEach 生命周期
+- ✅ 验证异步钩子与嵌套套件下的执行顺序
+
 ## 测试覆盖分析
 
 ### 接口方法覆盖
@@ -379,11 +400,13 @@
 
 ## 结论
 
-@dreamer/webrtc 库经过全面测试，所有 137 个测试全部通过，测试覆盖率达到 100%。客户端和服务端的所有功能、边界情况、错误处理都有完整的测试覆盖。集成测试验证了端到端的完整流程，浏览器测试验证了在真实浏览器环境中的功能，包括 RTCPeerConnection、MediaStream 等浏览器 API 的完整支持。架构模式测试验证了 Mesh、SFU 和自动切换功能的正确性，支持小规模（< 10 人）使用 Mesh 架构，大规模（> 10 人）自动切换到 SFU 架构，可以放心用于生产环境。
+@dreamer/webrtc 库经过全面测试，本次运行 **163 个测试全部通过**，测试覆盖率达到 100%。客户端和服务端的所有功能、边界情况、错误处理都有完整的测试覆盖。集成测试验证了端到端的完整流程，浏览器测试验证了在真实浏览器环境中的功能，包括 RTCPeerConnection、MediaStream 等浏览器 API 的完整支持。架构模式测试验证了 Mesh、SFU 和自动切换功能的正确性，支持小规模（< 10 人）使用 Mesh 架构，大规模（> 10 人）自动切换到 SFU 架构。新增的钩子函数执行测试（hooks-execution.test.ts）覆盖了 beforeAll/afterAll/beforeEach/afterEach 等生命周期的正确执行，可以放心用于生产环境。
 
-**测试总数**: 137
+**测试总数**: 163  
+**执行时间**: 2m37s
 
 ---
 
-**报告生成时间**: 2026-01-18 10:13:24
-**测试框架版本**: @dreamer/test@^1.0.0-beta.13
+**报告生成时间**: 2026-01-27  
+**测试框架版本**: @dreamer/test@1.0.0-beta.37  
+**运行时适配器版本**: @dreamer/runtime-adapter@1.0.0-beta.19

@@ -1,41 +1,41 @@
 /**
  * @fileoverview 使用 @dreamer/test 浏览器测试集成进行浏览器端测试
  * 使用新版测试库的浏览器测试功能，自动管理 Puppeteer 和 esbuild
+ *
+ * 说明：入口含 @dreamer/socket-io 等 JSR，须传 browserMode: false，
+ * 让 @dreamer/test 把 JSR 打进 bundle，避免 IIFE+external 在浏览器里生成 require()。
+ * 首次运行会在「信令服务器已启动」后做一次 client 打包（含 JSR），可能需 1–2 分钟，属正常。
  */
 
 import { RUNTIME } from "@dreamer/runtime-adapter";
-import {
-  afterEach,
-  beforeEach,
-  describe,
-  expect,
-  it,
-} from "@dreamer/test";
+import { afterAll, beforeAll, describe, expect, it } from "@dreamer/test";
 import { SignalingServer } from "../src/server/mod.ts";
-import {
-  delay,
-  getAvailablePort,
-  waitForPortRelease,
-  waitForServerReady,
-} from "./test-utils.ts";
+import { delay, getAvailablePortAsync, waitForServerReady } from "./test-utils.ts";
 
 // 服务器相关变量
 let server: SignalingServer | null = null;
 let testPort: number;
 let serverUrl: string;
 
-// 浏览器测试配置
+// 浏览器测试配置：browserMode: false 将 JSR 打进去，不生成 require
+// 首次运行 createBrowserContext 时会打包 client（含 JSR），可能需 1–2 分钟，故加大超时
 const browserConfig = {
   // 禁用资源泄漏检查（浏览器测试可能有内部定时器）
   sanitizeOps: false,
   sanitizeResources: false,
+  // 单用例超时（含打包 + 启动浏览器 + 加载页面），首次打包较慢
+  timeout: 120_000,
   // 启用浏览器测试
   browser: {
     enabled: true,
-    // 客户端代码入口
+    // 客户端源码入口；browserMode: false 时会把 @dreamer/socket-io 等打进 bundle
     entryPoint: "./src/client/mod.ts",
     // 全局变量名
     globalName: "WebRTCClient",
+    // 不把 JSR 标为 external，打进 IIFE，避免浏览器里出现 require()
+    browserMode: false,
+    // 等待 window.WebRTCClient / testReady 的超时，首次打包+加载可能较慢
+    moduleLoadTimeout: 90_000,
     // 无头模式
     headless: true,
     // Chrome 启动参数（支持 WebRTC 测试）
@@ -60,9 +60,10 @@ const browserConfig = {
 };
 
 describe(`WebRTC - 浏览器测试 (${RUNTIME})`, () => {
-  // 在每个测试前启动信令服务器
-  beforeEach(async () => {
-    testPort = getAvailablePort();
+  // 在所有测试前启动信令服务器
+  beforeAll(async () => {
+    console.log(`[${RUNTIME}] beforeAll 启动信令服务器.......................1`);
+    testPort = await getAvailablePortAsync();
     serverUrl = `http://localhost:${testPort}`;
     server = new SignalingServer({
       port: testPort,
@@ -73,14 +74,14 @@ describe(`WebRTC - 浏览器测试 (${RUNTIME})`, () => {
     console.log(`[${RUNTIME}] 信令服务器已启动: ${serverUrl}`);
   });
 
-  // 在每个测试后关闭信令服务器
-  afterEach(async () => {
-    // 等待所有异步操作完成
-    await delay(300);
+  // 在所有测试后关闭信令服务器
+  afterAll(async () => {
+    console.log(`[${RUNTIME}] afterAll 关闭信令服务器.......................2`);
+
+
     if (server) {
       await server.close();
-      // 等待端口完全释放，确保后续测试可以正常启动
-      await waitForPortRelease(testPort);
+      await delay(200);
       server = null;
       console.log(`[${RUNTIME}] 信令服务器已关闭`);
     }
@@ -137,8 +138,7 @@ describe(`WebRTC - 浏览器测试 (${RUNTIME})`, () => {
 
           const hasMediaStream = typeof win.MediaStream !== "undefined";
 
-          const hasGetUserMedia =
-            typeof navigator !== "undefined" &&
+          const hasGetUserMedia = typeof navigator !== "undefined" &&
             typeof (navigator as any).mediaDevices !== "undefined" &&
             typeof (navigator as any).mediaDevices.getUserMedia === "function";
 
@@ -491,10 +491,8 @@ describe(`WebRTC - 浏览器测试 (${RUNTIME})`, () => {
 
           const stream = new win.MediaStream();
           const hasGetTracks = typeof stream.getTracks === "function";
-          const hasGetAudioTracks =
-            typeof stream.getAudioTracks === "function";
-          const hasGetVideoTracks =
-            typeof stream.getVideoTracks === "function";
+          const hasGetAudioTracks = typeof stream.getAudioTracks === "function";
+          const hasGetVideoTracks = typeof stream.getVideoTracks === "function";
 
           return {
             success: true,
@@ -531,11 +529,9 @@ describe(`WebRTC - 浏览器测试 (${RUNTIME})`, () => {
             typeof pc.iceConnectionState === "string";
           const hasConnectionState = typeof pc.connectionState === "string";
           const hasSignalingState = typeof pc.signalingState === "string";
-          const hasLocalDescription =
-            pc.localDescription === null ||
+          const hasLocalDescription = pc.localDescription === null ||
             typeof pc.localDescription === "object";
-          const hasRemoteDescription =
-            pc.remoteDescription === null ||
+          const hasRemoteDescription = pc.remoteDescription === null ||
             typeof pc.remoteDescription === "object";
 
           pc.close();
@@ -573,8 +569,7 @@ describe(`WebRTC - 浏览器测试 (${RUNTIME})`, () => {
             iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
           });
 
-          const hasOnIceCandidate =
-            typeof pc.onicecandidate === "function" ||
+          const hasOnIceCandidate = typeof pc.onicecandidate === "function" ||
             pc.onicecandidate === null;
           const hasOnIceConnectionStateChange =
             typeof pc.oniceconnectionstatechange === "function" ||
@@ -582,10 +577,9 @@ describe(`WebRTC - 浏览器测试 (${RUNTIME})`, () => {
           const hasOnConnectionStateChange =
             typeof pc.onconnectionstatechange === "function" ||
             pc.onconnectionstatechange === null;
-          const hasOnTrack =
-            typeof pc.ontrack === "function" || pc.ontrack === null;
-          const hasOnDataChannel =
-            typeof pc.ondatachannel === "function" ||
+          const hasOnTrack = typeof pc.ontrack === "function" ||
+            pc.ontrack === null;
+          const hasOnDataChannel = typeof pc.ondatachannel === "function" ||
             pc.ondatachannel === null;
 
           pc.close();

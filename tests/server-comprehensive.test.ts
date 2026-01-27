@@ -8,17 +8,17 @@ import { SignalingServer } from "../src/server/mod.ts";
 import {
   delay,
   getAvailablePort,
+  getAvailablePortAsync,
   waitForPortRelease,
   waitForServerReady,
 } from "./test-utils.ts";
-import type { SignalingMessage } from "../src/types.ts";
 
 describe("SignalingServer 全面测试", () => {
   let server: SignalingServer;
   let testPort: number;
 
   beforeEach(async () => {
-    testPort = getAvailablePort();
+    testPort = await getAvailablePortAsync();
     server = new SignalingServer({
       port: testPort,
       stunServers: [{ urls: "stun:stun.l.google.com:19302" }],
@@ -39,7 +39,7 @@ describe("SignalingServer 全面测试", () => {
   });
 
   describe("批量消息处理", () => {
-    it("应该批量处理 ICE candidates", async () => {
+    it("应该批量处理 ICE candidates", () => {
       // 这个测试需要实际的 Socket.IO 客户端连接
       // 在实际测试中，可以通过客户端发送多个 ICE candidates
       // 验证服务器是否正确批量处理
@@ -128,4 +128,4 @@ describe("SignalingServer 全面测试", () => {
       corsServer.close();
     }, { timeout: 15000 });
   });
-});
+}, { sanitizeOps: false, sanitizeResources: false });

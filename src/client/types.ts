@@ -223,23 +223,58 @@ export interface MediaDevices {
 /**
  * 浏览器全局对象类型（用于访问浏览器 API）
  * 在浏览器环境中，这些构造函数由浏览器提供
+ *
+ * 注意：在浏览器编译时，这些值从 globalThis 获取，确保有实际的运行时值
  */
-export declare const RTCPeerConnection: {
+export const RTCPeerConnection: {
   new (configuration?: any): RTCPeerConnection;
-};
+} = typeof globalThis !== "undefined" && (globalThis as any).RTCPeerConnection
+  ? (globalThis as any).RTCPeerConnection
+  : (class {
+    constructor(_configuration?: any) {
+      throw new Error(
+        "RTCPeerConnection is not available in this environment",
+      );
+    }
+  } as any);
 
-export declare const MediaStream: {
+export const MediaStream: {
   new (tracks?: MediaStreamTrack[]): MediaStream;
-};
+} = typeof globalThis !== "undefined" && (globalThis as any).MediaStream
+  ? (globalThis as any).MediaStream
+  : (class {
+    constructor(_tracks?: MediaStreamTrack[]) {
+      throw new Error("MediaStream is not available in this environment");
+    }
+  } as any);
 
-export declare const RTCSessionDescription: {
+export const RTCSessionDescription: {
   new (descriptionInitDict: RTCSessionDescriptionInit): RTCSessionDescription;
-};
+} = typeof globalThis !== "undefined" &&
+    (globalThis as any).RTCSessionDescription
+  ? (globalThis as any).RTCSessionDescription
+  : (class {
+    constructor(_descriptionInitDict: RTCSessionDescriptionInit) {
+      throw new Error(
+        "RTCSessionDescription is not available in this environment",
+      );
+    }
+  } as any);
 
-export declare const RTCIceCandidate: {
+export const RTCIceCandidate: {
   new (candidateInitDict?: RTCIceCandidateInit): RTCIceCandidate;
-};
+} = typeof globalThis !== "undefined" && (globalThis as any).RTCIceCandidate
+  ? (globalThis as any).RTCIceCandidate
+  : (class {
+    constructor(_candidateInitDict?: RTCIceCandidateInit) {
+      throw new Error(
+        "RTCIceCandidate is not available in this environment",
+      );
+    }
+  } as any);
 
-export declare const navigator: {
+export const navigator: {
   mediaDevices?: MediaDevices;
-};
+} = typeof globalThis !== "undefined" && (globalThis as any).navigator
+  ? (globalThis as any).navigator
+  : ({} as any);

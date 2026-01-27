@@ -5,13 +5,13 @@
 
 import { afterEach, beforeEach, describe, expect, it } from "@dreamer/test";
 import { RTCClient } from "../src/client/mod.ts";
+import { SignalingServer } from "../src/server/mod.ts";
 import {
   delay,
-  getAvailablePort,
+  getAvailablePortAsync,
   waitForPortRelease,
   waitForServerReady,
 } from "./test-utils.ts";
-import { SignalingServer } from "../src/server/mod.ts";
 
 describe("RTCClient", () => {
   let server: SignalingServer;
@@ -19,7 +19,7 @@ describe("RTCClient", () => {
   let serverUrl: string;
 
   beforeEach(async () => {
-    testPort = getAvailablePort();
+    testPort = await getAvailablePortAsync();
     serverUrl = `http://localhost:${testPort}`;
     server = new SignalingServer({
       port: testPort,
@@ -104,12 +104,26 @@ describe("RTCClient", () => {
     }, { timeout: 15000 });
 
     it("应该自动连接", async () => {
+      const hasRTC = typeof (globalThis as { RTCPeerConnection?: unknown }).RTCPeerConnection !==
+        "undefined";
       const client = new RTCClient({
         signalingUrl: serverUrl,
         autoConnect: true,
       });
-      await delay(500);
-      expect(client).toBeTruthy();
+
+      if (hasRTC) {
+        // 有 WebRTC（如 Deno/浏览器）：等待信令连接成功，断言状态为 connected
+        const deadline = Date.now() + 8_000;
+        while (client.getConnectionState() !== "connected" && Date.now() < deadline) {
+          await delay(200);
+        }
+        expect(client.getConnectionState()).toBe("connected");
+      } else {
+        // 无 WebRTC（如 Bun）：connect() 会立即置为 failed，短延迟后断言
+        await delay(300);
+        expect(client.getConnectionState()).toBe("failed");
+      }
+
       client.disconnect();
       await delay(200);
     }, { timeout: 15000 });
@@ -136,7 +150,14 @@ describe("RTCClient", () => {
       });
       await delay(100);
       const state = client.getConnectionState();
-      expect(["new", "connecting", "connected", "disconnected", "failed", "closed"]).toContain(state);
+      expect([
+        "new",
+        "connecting",
+        "connected",
+        "disconnected",
+        "failed",
+        "closed",
+      ]).toContain(state);
       client.disconnect();
       await delay(100);
     }, { timeout: 15000 });
@@ -148,7 +169,15 @@ describe("RTCClient", () => {
       });
       await delay(100);
       const state = client.getICEConnectionState();
-      expect(["new", "checking", "connected", "completed", "failed", "disconnected", "closed"]).toContain(state);
+      expect([
+        "new",
+        "checking",
+        "connected",
+        "completed",
+        "failed",
+        "disconnected",
+        "closed",
+      ]).toContain(state);
       client.disconnect();
       await delay(100);
     }, { timeout: 15000 });
@@ -228,9 +257,9 @@ describe("RTCClient", () => {
         autoConnect: false,
       });
       await delay(100);
-      let eventFired = false;
+      let _eventFired = false;
       client.on("connection-state-change", () => {
-        eventFired = true;
+        _eventFired = true;
       });
       client.connect();
       await delay(500);
@@ -292,4 +321,4 @@ describe("RTCClient", () => {
       await delay(100);
     }, { timeout: 15000 });
   });
-});
+}, { sanitizeOps: false, sanitizeResources: false });

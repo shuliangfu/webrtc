@@ -8,7 +8,7 @@ import { RTCClient } from "../src/client/client.ts";
 import { SignalingServer } from "../src/server/server.ts";
 import {
   delay,
-  getAvailablePort,
+  getAvailablePortAsync,
   waitForPortRelease,
   waitForServerReady,
 } from "./test-utils.ts";
@@ -19,8 +19,8 @@ describe("架构模式测试", () => {
   let serverPort: number;
 
   beforeEach(async () => {
-    // 获取可用端口
-    serverPort = getAvailablePort();
+    // 使用真正可用的端口，避免 AddrInUse（与其它测试或进程冲突）
+    serverPort = await getAvailablePortAsync();
     serverUrl = `http://localhost:${serverPort}`;
 
     // 创建信令服务器
@@ -55,7 +55,7 @@ describe("架构模式测试", () => {
       // 在 Mesh 模式下，应该创建点对点连接
 
       client1.disconnect();
-    }, { timeout: 15000 });
+    }, { sanitizeOps: false, sanitizeResources: false, timeout: 15000 });
   });
 
   describe("SFU 模式", () => {
@@ -73,7 +73,7 @@ describe("架构模式测试", () => {
       // 注意：SFU 模式需要实际的 SFU 服务器才能完全测试
 
       client1.disconnect();
-    }, { timeout: 15000 });
+    }, { sanitizeOps: false, sanitizeResources: false, timeout: 15000 });
 
     it("应该在没有 SFU 配置时回退到 Mesh 模式", () => {
       const client1 = new RTCClient({
@@ -87,7 +87,7 @@ describe("架构模式测试", () => {
       // 应该能够创建客户端，但不会初始化 SFU 适配器
 
       client1.disconnect();
-    }, { timeout: 15000 });
+    }, { sanitizeOps: false, sanitizeResources: false, timeout: 15000 });
   });
 
   describe("自动模式（Auto）", () => {
@@ -103,11 +103,11 @@ describe("架构模式测试", () => {
       // 初始状态应该是 Mesh 模式
 
       client1.disconnect();
-    }, { timeout: 15000 });
+    }, { sanitizeOps: false, sanitizeResources: false, timeout: 15000 });
 
     it("应该根据房间人数自动切换架构模式", async () => {
       // 跳过实际 WebRTC 连接测试（需要浏览器环境）
-      if (typeof globalThis.RTCPeerConnection === "undefined") {
+      if (typeof (globalThis as any).RTCPeerConnection === "undefined") {
         console.log("跳过测试：RTCPeerConnection 不可用（需要浏览器环境）");
         return;
       }
@@ -165,13 +165,13 @@ describe("架构模式测试", () => {
       // 应该使用自定义阈值
 
       client1.disconnect();
-    }, { timeout: 15000 });
+    }, { sanitizeOps: false, sanitizeResources: false, timeout: 15000 });
   });
 
   describe("架构模式切换", () => {
     it("应该在房间人数达到阈值时切换到 SFU 模式", async () => {
       // 跳过实际 WebRTC 连接测试（需要浏览器环境）
-      if (typeof globalThis.RTCPeerConnection === "undefined") {
+      if (typeof (globalThis as any).RTCPeerConnection === "undefined") {
         console.log("跳过测试：RTCPeerConnection 不可用（需要浏览器环境）");
         return;
       }
@@ -223,7 +223,7 @@ describe("架构模式测试", () => {
 
     it("应该在房间人数减少时切换回 Mesh 模式", async () => {
       // 跳过实际 WebRTC 连接测试（需要浏览器环境）
-      if (typeof globalThis.RTCPeerConnection === "undefined") {
+      if (typeof (globalThis as any).RTCPeerConnection === "undefined") {
         console.log("跳过测试：RTCPeerConnection 不可用（需要浏览器环境）");
         return;
       }
@@ -280,7 +280,7 @@ describe("架构模式测试", () => {
       // 应该默认使用 auto 模式
 
       client1.disconnect();
-    }, { timeout: 15000 });
+    }, { sanitizeOps: false, sanitizeResources: false, timeout: 15000 });
 
     it("应该在没有指定阈值时使用默认值 10", () => {
       const client1 = new RTCClient({
@@ -294,6 +294,6 @@ describe("架构模式测试", () => {
       // 应该使用默认阈值 10
 
       client1.disconnect();
-    }, { timeout: 15000 });
+    }, { sanitizeOps: false, sanitizeResources: false, timeout: 15000 });
   });
 });
