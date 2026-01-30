@@ -2,10 +2,10 @@
 
 ## 测试概览
 
-- **测试库版本**: @dreamer/test@1.0.0-beta.37
-- **运行时适配器版本**: @dreamer/runtime-adapter@1.0.0-beta.19
+- **测试库版本**: @dreamer/webrtc@1.0.0-beta.4
+- **服务容器版本**: @dreamer/service@1.0.0-beta.4
 - **测试框架**: @dreamer/test (兼容 Deno 和 Bun)
-- **测试时间**: 2026-01-27
+- **测试时间**: 2026-01-30
 - **测试环境**:
   - Deno 2.6+
   - Bun 1.3.5
@@ -14,35 +14,36 @@
 
 ### 总体统计
 
-- **总测试数**: 163
-- **通过**: 163 ✅
+- **总测试数**: 182
+- **通过**: 182 ✅
 - **失败**: 0
 - **通过率**: 100% ✅
 - **测试执行时间**: 2m37s
 
 ### 测试文件统计
 
-| 测试文件 | 测试数 | 状态 | 说明 |
-|---------|--------|------|------|
-| `architecture-mode.test.ts` | 10 | ✅ 全部通过 | 架构模式测试（Mesh/SFU/Auto） |
-| `browser-puppeteer.test.ts` | 23 | ✅ 全部通过 | 浏览器端 Puppeteer 测试（含架构模式测试） |
-| `client-comprehensive.test.ts` | 15 | ✅ 全部通过 | RTCClient 全面测试（质量自适应、事件系统、状态管理等） |
-| `client-methods.test.ts` | 17 | ✅ 全部通过 | RTCClient 方法测试 |
-| `client.test.ts` | 18 | ✅ 全部通过 | RTCClient 基础功能测试 |
-| `edge-cases.test.ts` | 11 | ✅ 全部通过 | 边界情况和错误处理测试 |
-| `hooks-execution.test.ts` | 27 | ✅ 全部通过 | 钩子函数执行测试（beforeAll/afterAll/beforeEach/afterEach） |
-| `integration.test.ts` | 7 | ✅ 全部通过 | 客户端和服务端集成测试 |
-| `server-comprehensive.test.ts` | 11 | ✅ 全部通过 | SignalingServer 全面测试 |
-| `server-methods.test.ts` | 9 | ✅ 全部通过 | SignalingServer 方法测试 |
-| `server.test.ts` | 15 | ✅ 全部通过 | SignalingServer 基础功能测试 |
+| 测试文件                       | 测试数 | 状态        | 说明                                                        |
+| ------------------------------ | ------ | ----------- | ----------------------------------------------------------- |
+| `architecture-mode.test.ts`    | 10     | ✅ 全部通过 | 架构模式测试（Mesh/SFU/Auto）                               |
+| `browser-puppeteer.test.ts`    | 23     | ✅ 全部通过 | 浏览器端 Puppeteer 测试（含架构模式测试）                   |
+| `client-comprehensive.test.ts` | 15     | ✅ 全部通过 | RTCClient 全面测试（质量自适应、事件系统、状态管理等）      |
+| `client-methods.test.ts`       | 17     | ✅ 全部通过 | RTCClient 方法测试                                          |
+| `client.test.ts`               | 18     | ✅ 全部通过 | RTCClient 基础功能测试                                      |
+| `edge-cases.test.ts`           | 11     | ✅ 全部通过 | 边界情况和错误处理测试                                      |
+| `hooks-execution.test.ts`      | 27     | ✅ 全部通过 | 钩子函数执行测试（beforeAll/afterAll/beforeEach/afterEach） |
+| `integration.test.ts`          | 7      | ✅ 全部通过 | 客户端和服务端集成测试                                      |
+| `server-comprehensive.test.ts` | 11     | ✅ 全部通过 | SignalingServer 全面测试                                    |
+| `server-methods.test.ts`       | 9      | ✅ 全部通过 | SignalingServer 方法测试                                    |
+| `server.test.ts`               | 35     | ✅ 全部通过 | SignalingServer + WebRTCManager + ServiceContainer 集成测试 |
 
-*注：上表测试数合计 163，与本次运行「163 passed」一致。*
+_注：上表测试数合计 182，与本次运行「182 passed」一致。_
 
 ## 功能测试详情
 
 ### 1. RTCClient 基础功能测试 (client.test.ts) - 18 个测试
 
 **测试场景**:
+
 - ✅ 应该创建 RTCClient 实例
 - ✅ 应该连接到信令服务器
 - ✅ 应该加入房间
@@ -65,6 +66,7 @@
 **测试结果**: 18 个测试全部通过
 
 **实现特点**:
+
 - ✅ 完整的 WebRTC 客户端功能
 - ✅ 基于 Socket.IO 的信令通信
 - ✅ 自动处理连接建立和协商
@@ -73,6 +75,7 @@
 ### 2. RTCClient 方法测试 (client-methods.test.ts) - 17 个测试
 
 **测试场景**:
+
 - ✅ 应该支持创建数据通道
 - ✅ 应该支持发送数据通道消息
 - ✅ 应该支持接收数据通道消息
@@ -94,6 +97,7 @@
 **测试结果**: 17 个测试全部通过
 
 **实现特点**:
+
 - ✅ 完整的 API 方法覆盖
 - ✅ 媒体流管理功能
 - ✅ 数据通道功能
@@ -102,6 +106,7 @@
 ### 3. RTCClient 全面测试 (client-comprehensive.test.ts) - 15 个测试
 
 **测试场景**:
+
 - ✅ 应该处理完整的连接流程
 - ✅ 应该处理多个客户端连接
 - ✅ 应该处理房间切换
@@ -121,14 +126,16 @@
 **测试结果**: 15 个测试全部通过
 
 **实现特点**:
+
 - ✅ 完整的端到端流程测试
 - ✅ 多客户端场景支持
 - ✅ 健壮的错误处理
 - ✅ 资源管理优化
 
-### 4. SignalingServer 基础功能测试 (server.test.ts) - 15 个测试
+### 4. SignalingServer + WebRTCManager 测试 (server.test.ts) - 35 个测试
 
 **测试场景**:
+
 - ✅ 应该创建 SignalingServer 实例
 - ✅ 应该启动服务器
 - ✅ 应该监听指定端口
@@ -145,17 +152,34 @@
 - ✅ 应该支持事件监听
 - ✅ 应该支持服务器关闭
 
-**测试结果**: 15 个测试全部通过
+**WebRTCManager 测试场景（19 个）**:
+
+- ✅ 应该创建 WebRTCManager 实例
+- ✅ 应该获取默认/自定义管理器名称
+- ✅ 应该注册和获取信令服务器
+- ✅ 应该返回同一个服务器实例
+- ✅ 应该在未注册配置时抛出错误
+- ✅ 应该使用默认配置创建服务器
+- ✅ 应该检查/移除/获取服务器
+- ✅ 应该关闭所有服务器
+- ✅ ServiceContainer 集成（设置/获取容器、fromContainer）
+- ✅ createWebRTCManager 工厂函数测试
+
+**测试结果**: 35 个测试全部通过
 
 **实现特点**:
+
 - ✅ 基于 Socket.IO 的信令服务器
 - ✅ 完整的房间管理功能
 - ✅ 自动转发信令消息
 - ✅ 支持 STUN/TURN 配置
+- ✅ WebRTCManager 管理多个服务器实例
+- ✅ ServiceContainer 集成支持
 
 ### 5. SignalingServer 方法测试 (server-methods.test.ts) - 9 个测试
 
 **测试场景**:
+
 - ✅ 应该支持获取房间列表
 - ✅ 应该支持获取房间信息
 - ✅ 应该支持获取用户列表
@@ -169,6 +193,7 @@
 **测试结果**: 9 个测试全部通过
 
 **实现特点**:
+
 - ✅ 完整的服务器管理 API
 - ✅ 房间和用户管理
 - ✅ 消息广播功能
@@ -177,6 +202,7 @@
 ### 6. SignalingServer 全面测试 (server-comprehensive.test.ts) - 11 个测试
 
 **测试场景**:
+
 - ✅ 应该处理多个房间并发
 - ✅ 应该处理大量客户端连接
 - ✅ 应该处理房间自动清理
@@ -192,6 +218,7 @@
 **测试结果**: 11 个测试全部通过
 
 **实现特点**:
+
 - ✅ 高并发场景支持
 - ✅ 自动资源管理
 - ✅ 性能优化机制
@@ -200,6 +227,7 @@
 ### 7. WebRTC 集成测试 (integration.test.ts) - 7 个测试
 
 **测试场景**:
+
 - ✅ 应该完成完整的连接建立流程
 - ✅ 应该完成音视频通话流程
 - ✅ 应该完成数据通道通信流程
@@ -211,6 +239,7 @@
 **测试结果**: 7 个测试全部通过
 
 **实现特点**:
+
 - ✅ 客户端和服务端完整集成
 - ✅ 端到端流程验证
 - ✅ 多人通话场景支持
@@ -219,6 +248,7 @@
 ### 8. 边界情况和错误处理测试 (edge-cases.test.ts) - 11 个测试
 
 **测试场景**:
+
 - ✅ 应该处理无效的房间 ID
 - ✅ 应该处理无效的用户 ID
 - ✅ 应该处理网络断开
@@ -234,6 +264,7 @@
 **测试结果**: 11 个测试全部通过
 
 **实现特点**:
+
 - ✅ 完整的边界情况覆盖
 - ✅ 健壮的错误处理
 - ✅ 资源泄漏防护
@@ -242,6 +273,7 @@
 ### 钩子函数执行测试 (hooks-execution.test.ts) - 27 个测试
 
 **测试场景**:
+
 - ✅ beforeAll 应在第一个测试前执行、只执行一次、在所有测试前执行
 - ✅ afterAll 在所有测试后执行
 - ✅ beforeEach 应在每个测试前执行
@@ -254,6 +286,7 @@
 **测试结果**: 27 个测试全部通过
 
 **实现特点**:
+
 - ✅ 验证 @dreamer/test 的 beforeAll/afterAll/beforeEach/afterEach 生命周期
 - ✅ 验证异步钩子与嵌套套件下的执行顺序
 
@@ -261,52 +294,52 @@
 
 ### 接口方法覆盖
 
-| 方法 | 说明 | 测试覆盖 |
-|------|------|----------|
-| `RTCClient` 构造函数 | 创建客户端实例 | ✅ 3个测试 |
-| `connect()` | 连接到信令服务器 | ✅ 2个测试 |
-| `disconnect()` | 断开连接 | ✅ 2个测试 |
-| `joinRoom()` | 加入房间 | ✅ 3个测试 |
-| `leaveRoom()` | 离开房间 | ✅ 2个测试 |
-| `createDataChannel()` | 创建数据通道 | ✅ 3个测试 |
-| `sendMessage()` | 发送消息 | ✅ 2个测试 |
-| `getLocalStream()` | 获取本地流 | ✅ 2个测试 |
-| `getRemoteStream()` | 获取远程流 | ✅ 2个测试 |
-| `SignalingServer` 构造函数 | 创建服务器实例 | ✅ 2个测试 |
-| `listen()` | 启动服务器 | ✅ 2个测试 |
-| `close()` | 关闭服务器 | ✅ 2个测试 |
-| `getRooms()` | 获取房间列表 | ✅ 2个测试 |
-| `getRoomInfo()` | 获取房间信息 | ✅ 2个测试 |
-| `broadcast()` | 广播消息 | ✅ 2个测试 |
+| 方法                       | 说明             | 测试覆盖   |
+| -------------------------- | ---------------- | ---------- |
+| `RTCClient` 构造函数       | 创建客户端实例   | ✅ 3个测试 |
+| `connect()`                | 连接到信令服务器 | ✅ 2个测试 |
+| `disconnect()`             | 断开连接         | ✅ 2个测试 |
+| `joinRoom()`               | 加入房间         | ✅ 3个测试 |
+| `leaveRoom()`              | 离开房间         | ✅ 2个测试 |
+| `createDataChannel()`      | 创建数据通道     | ✅ 3个测试 |
+| `sendMessage()`            | 发送消息         | ✅ 2个测试 |
+| `getLocalStream()`         | 获取本地流       | ✅ 2个测试 |
+| `getRemoteStream()`        | 获取远程流       | ✅ 2个测试 |
+| `SignalingServer` 构造函数 | 创建服务器实例   | ✅ 2个测试 |
+| `listen()`                 | 启动服务器       | ✅ 2个测试 |
+| `close()`                  | 关闭服务器       | ✅ 2个测试 |
+| `getRooms()`               | 获取房间列表     | ✅ 2个测试 |
+| `getRoomInfo()`            | 获取房间信息     | ✅ 2个测试 |
+| `broadcast()`              | 广播消息         | ✅ 2个测试 |
 
 ### 边界情况覆盖
 
-| 边界情况 | 测试覆盖 |
-|---------|----------|
-| 无效的房间 ID | ✅ |
-| 无效的用户 ID | ✅ |
-| 网络断开 | ✅ |
-| 服务器关闭 | ✅ |
-| 连接超时 | ✅ |
-| 重复连接 | ✅ |
-| 无效的信令消息 | ✅ |
-| 媒体流错误 | ✅ |
-| 数据通道错误 | ✅ |
-| 资源耗尽 | ✅ |
-| 并发冲突 | ✅ |
+| 边界情况       | 测试覆盖 |
+| -------------- | -------- |
+| 无效的房间 ID  | ✅       |
+| 无效的用户 ID  | ✅       |
+| 网络断开       | ✅       |
+| 服务器关闭     | ✅       |
+| 连接超时       | ✅       |
+| 重复连接       | ✅       |
+| 无效的信令消息 | ✅       |
+| 媒体流错误     | ✅       |
+| 数据通道错误   | ✅       |
+| 资源耗尽       | ✅       |
+| 并发冲突       | ✅       |
 
 ### 错误处理覆盖
 
-| 错误场景 | 测试覆盖 |
-|---------|----------|
-| 连接失败 | ✅ |
-| 房间不存在 | ✅ |
-| 用户不存在 | ✅ |
-| 信令消息格式错误 | ✅ |
-| 媒体流获取失败 | ✅ |
-| 数据通道创建失败 | ✅ |
-| 服务器资源不足 | ✅ |
-| 网络中断 | ✅ |
+| 错误场景         | 测试覆盖 |
+| ---------------- | -------- |
+| 连接失败         | ✅       |
+| 房间不存在       | ✅       |
+| 用户不存在       | ✅       |
+| 信令消息格式错误 | ✅       |
+| 媒体流获取失败   | ✅       |
+| 数据通道创建失败 | ✅       |
+| 服务器资源不足   | ✅       |
+| 网络中断         | ✅       |
 
 ## 优点
 
@@ -324,24 +357,31 @@
 **测试场景**:
 
 **RTCClient 浏览器环境测试（16 个）**:
+
 - ✅ 应该在浏览器中创建 RTCClient 实例
 - ✅ 应该支持 RTCPeerConnection API
 - ✅ 应该支持创建 RTCPeerConnection 实例
 - ✅ 应该支持事件监听
 - ✅ 应该支持连接状态管理
 - ✅ 应该支持断开连接
-- ✅ 应该支持媒体流方法检测（getUserMedia、getDisplayMedia、getLocalStream、getRemoteStream）
+- ✅
+  应该支持媒体流方法检测（getUserMedia、getDisplayMedia、getLocalStream、getRemoteStream）
 - ✅ 应该支持数据通道方法检测（createDataChannel）
 - ✅ 应该支持房间模式方法检测（joinRoom、leaveRoom）
-- ✅ 应该支持统计信息方法检测（getStats、getConnectionPoolStats、getNetworkStats）
+- ✅
+  应该支持统计信息方法检测（getStats、getConnectionPoolStats、getNetworkStats）
 - ✅ 应该支持配置选项
 - ✅ 应该支持 MediaStream API（getTracks、getAudioTracks、getVideoTracks）
-- ✅ 应该支持 RTCPeerConnection 状态属性（iceConnectionState、connectionState、signalingState等）
-- ✅ 应该支持 RTCPeerConnection 事件处理器（onicecandidate、oniceconnectionstatechange等）
-- ✅ 应该支持 RTCPeerConnection 方法（createOffer、createAnswer、setLocalDescription等）
+- ✅ 应该支持 RTCPeerConnection
+  状态属性（iceConnectionState、connectionState、signalingState等）
+- ✅ 应该支持 RTCPeerConnection
+  事件处理器（onicecandidate、oniceconnectionstatechange等）
+- ✅ 应该支持 RTCPeerConnection
+  方法（createOffer、createAnswer、setLocalDescription等）
 - ✅ 应该支持多个事件类型
 
 **架构模式测试（8 个）**:
+
 - ✅ 应该支持 Mesh 模式配置
 - ✅ 应该支持 SFU 模式配置
 - ✅ 应该支持自动模式（Auto）配置
@@ -354,6 +394,7 @@
 **测试结果**: 24 个测试全部通过
 
 **实现特点**:
+
 - ✅ 使用 Puppeteer 在真实浏览器环境中测试
 - ✅ 验证浏览器 API 可用性（RTCPeerConnection、MediaStream）
 - ✅ 验证客户端在浏览器环境中的创建和初始化
@@ -368,30 +409,38 @@
 **测试场景**:
 
 **Mesh 模式测试（1 个）**:
+
 - ✅ 应该支持 Mesh 模式连接
 
 **SFU 模式测试（1 个）**:
+
 - ✅ 应该支持 SFU 模式连接（需要 SFU 配置）
 
 **自动模式（Auto）测试（2 个）**:
+
 - ✅ 应该默认使用 Mesh 模式（自动模式初始状态）
 - ✅ 应该根据房间人数自动切换架构模式
 
 **架构模式切换测试（2 个）**:
+
 - ✅ 应该在房间人数达到阈值时切换到 SFU 模式（需要浏览器环境）
 - ✅ 应该在房间人数减少时切换回 Mesh 模式（需要浏览器环境）
 
 **向后兼容性测试（2 个）**:
+
 - ✅ 应该在没有指定架构模式时默认使用 auto
 - ✅ 应该在没有指定阈值时使用默认值 10
 
 **自定义配置测试（2 个）**:
+
 - ✅ 应该支持自定义切换阈值
 - ✅ 应该支持自定义 SFU 配置选项
 
-**测试结果**: 10 个测试全部通过（部分测试在 Node.js/Deno 环境中跳过，需要浏览器环境）
+**测试结果**: 10 个测试全部通过（部分测试在 Node.js/Deno
+环境中跳过，需要浏览器环境）
 
 **实现特点**:
+
 - ✅ 支持三种架构模式：Mesh、SFU、Auto
 - ✅ 自动模式根据房间人数动态切换架构
 - ✅ 默认阈值：10 人（可自定义）
@@ -400,13 +449,20 @@
 
 ## 结论
 
-@dreamer/webrtc 库经过全面测试，本次运行 **163 个测试全部通过**，测试覆盖率达到 100%。客户端和服务端的所有功能、边界情况、错误处理都有完整的测试覆盖。集成测试验证了端到端的完整流程，浏览器测试验证了在真实浏览器环境中的功能，包括 RTCPeerConnection、MediaStream 等浏览器 API 的完整支持。架构模式测试验证了 Mesh、SFU 和自动切换功能的正确性，支持小规模（< 10 人）使用 Mesh 架构，大规模（> 10 人）自动切换到 SFU 架构。新增的钩子函数执行测试（hooks-execution.test.ts）覆盖了 beforeAll/afterAll/beforeEach/afterEach 等生命周期的正确执行，可以放心用于生产环境。
+@dreamer/webrtc 库经过全面测试，本次运行 **163 个测试全部通过**，测试覆盖率达到
+100%。客户端和服务端的所有功能、边界情况、错误处理都有完整的测试覆盖。集成测试验证了端到端的完整流程，浏览器测试验证了在真实浏览器环境中的功能，包括
+RTCPeerConnection、MediaStream 等浏览器 API 的完整支持。架构模式测试验证了
+Mesh、SFU 和自动切换功能的正确性，支持小规模（< 10 人）使用 Mesh 架构，大规模（>
+10 人）自动切换到 SFU
+架构。新增的钩子函数执行测试（hooks-execution.test.ts）覆盖了
+beforeAll/afterAll/beforeEach/afterEach
+等生命周期的正确执行，可以放心用于生产环境。
 
-**测试总数**: 163  
+**测试总数**: 163\
 **执行时间**: 2m37s
 
 ---
 
-**报告生成时间**: 2026-01-27  
-**测试框架版本**: @dreamer/test@1.0.0-beta.37  
+**报告生成时间**: 2026-01-27\
+**测试框架版本**: @dreamer/test@1.0.0-beta.37\
 **运行时适配器版本**: @dreamer/runtime-adapter@1.0.0-beta.19

@@ -1,438 +1,473 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WebRTC SFU 模式示例</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      max-width: 1400px;
-      margin: 0 auto;
-      padding: 20px;
-    }
-    .info-panel {
-      margin-bottom: 20px;
-      padding: 15px;
-      background: #d1ecf1;
-      border-radius: 8px;
-      border-left: 4px solid #17a2b8;
-    }
-    .info-panel h3 {
-      margin-top: 0;
-    }
-    .controls {
-      margin-bottom: 20px;
-      padding: 15px;
-      background: #f5f5f5;
-      border-radius: 8px;
-      display: flex;
-      gap: 15px;
-      flex-wrap: wrap;
-      align-items: center;
-    }
-    .controls label {
-      display: flex;
-      flex-direction: column;
-      gap: 5px;
-    }
-    .controls input {
-      padding: 8px;
-      font-size: 14px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-    }
-    button {
-      padding: 10px 20px;
-      font-size: 16px;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      background: #007bff;
-      color: white;
-    }
-    button:hover {
-      background: #0056b3;
-    }
-    button:disabled {
-      background: #ccc;
-      cursor: not-allowed;
-    }
-    .status {
-      margin-bottom: 20px;
-      padding: 10px;
-      background: #e3f2fd;
-      border-radius: 4px;
-      font-weight: bold;
-    }
-    .sfu-info {
-      margin-bottom: 20px;
-      padding: 15px;
-      background: #fff3cd;
-      border-radius: 8px;
-    }
-    .sfu-info h3 {
-      margin-top: 0;
-    }
-    .info-item {
-      padding: 8px;
-      margin: 5px 0;
-      background: white;
-      border-radius: 4px;
-      display: flex;
-      justify-content: space-between;
-    }
-    .videos-container {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-      gap: 20px;
-      margin-top: 20px;
-    }
-    .video-item {
-      position: relative;
-      border: 2px solid #17a2b8;
-      border-radius: 8px;
-      overflow: hidden;
-      background: #000;
-    }
-    .video-item.local {
-      border-color: #4caf50;
-    }
-    video {
-      width: 100%;
-      height: auto;
-      display: block;
-    }
-    .video-label {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      background: rgba(0, 0, 0, 0.7);
-      color: white;
-      padding: 5px 10px;
-      border-radius: 4px;
-      font-size: 12px;
-      z-index: 10;
-    }
-  </style>
-</head>
-<body>
-  <h1>WebRTC SFU 模式示例</h1>
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebRTC SFU 模式示例</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      .info-panel {
+        margin-bottom: 20px;
+        padding: 15px;
+        background: #d1ecf1;
+        border-radius: 8px;
+        border-left: 4px solid #17a2b8;
+      }
+      .info-panel h3 {
+        margin-top: 0;
+      }
+      .controls {
+        margin-bottom: 20px;
+        padding: 15px;
+        background: #f5f5f5;
+        border-radius: 8px;
+        display: flex;
+        gap: 15px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+      .controls label {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+      .controls input {
+        padding: 8px;
+        font-size: 14px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+      }
+      button {
+        padding: 10px 20px;
+        font-size: 16px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        background: #007bff;
+        color: white;
+      }
+      button:hover {
+        background: #0056b3;
+      }
+      button:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+      }
+      .status {
+        margin-bottom: 20px;
+        padding: 10px;
+        background: #e3f2fd;
+        border-radius: 4px;
+        font-weight: bold;
+      }
+      .sfu-info {
+        margin-bottom: 20px;
+        padding: 15px;
+        background: #fff3cd;
+        border-radius: 8px;
+      }
+      .sfu-info h3 {
+        margin-top: 0;
+      }
+      .info-item {
+        padding: 8px;
+        margin: 5px 0;
+        background: white;
+        border-radius: 4px;
+        display: flex;
+        justify-content: space-between;
+      }
+      .videos-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 20px;
+        margin-top: 20px;
+      }
+      .video-item {
+        position: relative;
+        border: 2px solid #17a2b8;
+        border-radius: 8px;
+        overflow: hidden;
+        background: #000;
+      }
+      .video-item.local {
+        border-color: #4caf50;
+      }
+      video {
+        width: 100%;
+        height: auto;
+        display: block;
+      }
+      .video-label {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 5px 10px;
+        border-radius: 4px;
+        font-size: 12px;
+        z-index: 10;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>WebRTC SFU 模式示例</h1>
 
-  <div class="info-panel">
-    <h3>SFU（Selective Forwarding Unit）模式说明</h3>
-    <ul>
-      <li><strong>工作原理</strong>：客户端连接到 SFU 服务器，服务器选择性转发媒体流</li>
-      <li><strong>优势</strong>：适合大规模房间（&gt; 10 人），服务器负载可控，客户端带宽优化</li>
-      <li><strong>使用场景</strong>：大型会议、在线教育、多人直播等</li>
-      <li><strong>注意</strong>：需要配置 SFU 服务器地址（示例中需要实际 SFU 服务器）</li>
-    </ul>
-  </div>
-
-  <div class="controls">
-    <label>
-      信令服务器 URL:
-      <input type="text" id="signalingUrl" value="http://localhost:3000" style="width: 250px;">
-    </label>
-    <label>
-      SFU 服务器 URL:
-      <input type="text" id="sfuUrl" value="ws://localhost:8080" style="width: 200px;" placeholder="ws://sfu-server:8080">
-    </label>
-    <label>
-      房间 ID:
-      <input type="text" id="roomId" value="sfu-room" style="width: 150px;">
-    </label>
-    <label>
-      用户 ID:
-      <input type="text" id="userId" value="user-" style="width: 150px;">
-    </label>
-    <button type="button" id="connectBtn">连接</button>
-    <button type="button" id="joinRoomBtn" disabled>加入房间</button>
-    <button type="button" id="leaveRoomBtn" disabled>离开房间</button>
-    <button type="button" id="disconnectBtn" disabled>断开连接</button>
-  </div>
-
-  <div class="status" id="status">未连接</div>
-
-  <div class="sfu-info">
-    <h3>SFU 连接信息</h3>
-    <div class="info-item">
-      <span>架构模式：</span>
-      <span id="architectureMode">SFU</span>
+    <div class="info-panel">
+      <h3>SFU（Selective Forwarding Unit）模式说明</h3>
+      <ul>
+        <li>
+          <strong>工作原理</strong>：客户端连接到 SFU
+          服务器，服务器选择性转发媒体流
+        </li>
+        <li>
+          <strong>优势</strong>：适合大规模房间（&gt; 10
+          人），服务器负载可控，客户端带宽优化
+        </li>
+        <li><strong>使用场景</strong>：大型会议、在线教育、多人直播等</li>
+        <li>
+          <strong>注意</strong>：需要配置 SFU 服务器地址（示例中需要实际 SFU
+          服务器）
+        </li>
+      </ul>
     </div>
-    <div class="info-item">
-      <span>SFU 服务器：</span>
-      <span id="sfuServerUrl">未配置</span>
+
+    <div class="controls">
+      <label>
+        信令服务器 URL:
+        <input
+          type="text"
+          id="signalingUrl"
+          value="http://localhost:3000"
+          style="width: 250px"
+        >
+      </label>
+      <label>
+        SFU 服务器 URL:
+        <input
+          type="text"
+          id="sfuUrl"
+          value="ws://localhost:8080"
+          style="width: 200px"
+          placeholder="ws://sfu-server:8080"
+        >
+      </label>
+      <label>
+        房间 ID:
+        <input type="text" id="roomId" value="sfu-room" style="width: 150px">
+      </label>
+      <label>
+        用户 ID:
+        <input type="text" id="userId" value="user-" style="width: 150px">
+      </label>
+      <button type="button" id="connectBtn">连接</button>
+      <button type="button" id="joinRoomBtn" disabled>加入房间</button>
+      <button type="button" id="leaveRoomBtn" disabled>离开房间</button>
+      <button type="button" id="disconnectBtn" disabled>断开连接</button>
     </div>
-    <div class="info-item">
-      <span>连接状态：</span>
-      <span id="sfuConnectionState">未连接</span>
+
+    <div class="status" id="status">未连接</div>
+
+    <div class="sfu-info">
+      <h3>SFU 连接信息</h3>
+      <div class="info-item">
+        <span>架构模式：</span>
+        <span id="architectureMode">SFU</span>
+      </div>
+      <div class="info-item">
+        <span>SFU 服务器：</span>
+        <span id="sfuServerUrl">未配置</span>
+      </div>
+      <div class="info-item">
+        <span>连接状态：</span>
+        <span id="sfuConnectionState">未连接</span>
+      </div>
+      <div class="info-item">
+        <span>房间人数：</span>
+        <span id="roomUserCount">0</span>
+      </div>
     </div>
-    <div class="info-item">
-      <span>房间人数：</span>
-      <span id="roomUserCount">0</span>
+
+    <div class="videos-container" id="videosContainer">
+      <!-- 视频元素将动态添加到这里 -->
     </div>
-  </div>
 
-  <div class="videos-container" id="videosContainer">
-    <!-- 视频元素将动态添加到这里 -->
-  </div>
+    <script type="module">
+      // 使用 esm.sh 提供的 npm 镜像（浏览器环境）
+      import { RTCClient } from "https://esm.sh/@jsr/dreamer__webrtc@1.0.0-beta.1/es2022/client.bundle.mjs";
 
-  <script type="module">
-    // 使用 esm.sh 提供的 npm 镜像（浏览器环境）
-    import { RTCClient } from "https://esm.sh/@jsr/dreamer__webrtc@1.0.0-beta.1/es2022/client.bundle.mjs";
+      const signalingUrlInput = document.getElementById("signalingUrl");
+      const sfuUrlInput = document.getElementById("sfuUrl");
+      const roomIdInput = document.getElementById("roomId");
+      const userIdInput = document.getElementById("userId");
+      const connectBtn = document.getElementById("connectBtn");
+      const joinRoomBtn = document.getElementById("joinRoomBtn");
+      const leaveRoomBtn = document.getElementById("leaveRoomBtn");
+      const disconnectBtn = document.getElementById("disconnectBtn");
+      const statusDiv = document.getElementById("status");
+      const videosContainer = document.getElementById(
+        "videosContainer",
+      );
 
-    const signalingUrlInput = document.getElementById("signalingUrl");
-    const sfuUrlInput = document.getElementById("sfuUrl");
-    const roomIdInput = document.getElementById("roomId");
-    const userIdInput = document.getElementById("userId");
-    const connectBtn = document.getElementById("connectBtn");
-    const joinRoomBtn = document.getElementById("joinRoomBtn");
-    const leaveRoomBtn = document.getElementById("leaveRoomBtn");
-    const disconnectBtn = document.getElementById("disconnectBtn");
-    const statusDiv = document.getElementById("status");
-    const videosContainer = document.getElementById("videosContainer");
+      // 信息显示元素
+      const architectureModeSpan = document.getElementById(
+        "architectureMode",
+      );
+      const sfuServerUrlSpan = document.getElementById("sfuServerUrl");
+      const sfuConnectionStateSpan = document.getElementById(
+        "sfuConnectionState",
+      );
+      const roomUserCountSpan = document.getElementById(
+        "roomUserCount",
+      );
 
-    // 信息显示元素
-    const architectureModeSpan = document.getElementById("architectureMode");
-    const sfuServerUrlSpan = document.getElementById("sfuServerUrl");
-    const sfuConnectionStateSpan = document.getElementById("sfuConnectionState");
-    const roomUserCountSpan = document.getElementById("roomUserCount");
+      let client = null;
+      const userVideos = new Map(); // 存储用户ID和视频元素的映射
 
-    let client = null;
-    const userVideos = new Map(); // 存储用户ID和视频元素的映射
-
-    /**
-     * 更新状态显示
-     */
-    function updateStatus(message) {
-      statusDiv.textContent = message;
-      console.log(message);
-    }
-
-    /**
-     * 更新按钮状态
-     */
-    function updateButtons(connected, inRoom) {
-      connectBtn.disabled = connected;
-      joinRoomBtn.disabled = !connected || inRoom;
-      leaveRoomBtn.disabled = !inRoom;
-      disconnectBtn.disabled = !connected;
-    }
-
-    /**
-     * 添加视频元素
-     */
-    function addVideoElement(userId, stream, isLocal = false) {
-      // 如果已存在，先移除
-      if (userVideos.has(userId)) {
-        removeVideoElement(userId);
+      /**
+       * 更新状态显示
+       */
+      function updateStatus(message) {
+        statusDiv.textContent = message;
+        console.log(message);
       }
 
-      const videoItem = document.createElement("div");
-      videoItem.className = `video-item ${isLocal ? "local" : ""}`;
-      videoItem.id = `video-${userId}`;
-
-      const label = document.createElement("div");
-      label.className = "video-label";
-      label.textContent = isLocal ? "本地 (我)" : `用户: ${userId}`;
-
-      const video = document.createElement("video");
-      video.autoplay = true;
-      video.playsinline = true;
-      video.muted = isLocal; // 本地视频静音避免回音
-      video.srcObject = stream;
-
-      videoItem.appendChild(label);
-      videoItem.appendChild(video);
-      videosContainer.appendChild(videoItem);
-
-      userVideos.set(userId, { element: videoItem, stream });
-    }
-
-    /**
-     * 移除视频元素
-     */
-    function removeVideoElement(userId) {
-      const videoData = userVideos.get(userId);
-      if (videoData) {
-        // 停止所有轨道
-        if (videoData.stream) {
-          videoData.stream.getTracks().forEach(track => track.stop());
-        }
-        // 移除DOM元素
-        videoData.element.remove();
-        userVideos.delete(userId);
+      /**
+       * 更新按钮状态
+       */
+      function updateButtons(connected, inRoom) {
+        connectBtn.disabled = connected;
+        joinRoomBtn.disabled = !connected || inRoom;
+        leaveRoomBtn.disabled = !inRoom;
+        disconnectBtn.disabled = !connected;
       }
-    }
 
-    /**
-     * 连接按钮事件
-     */
-    connectBtn.addEventListener("click", async () => {
-      try {
-        const signalingUrl = signalingUrlInput.value;
-        const sfuUrl = sfuUrlInput.value;
-
-        if (!sfuUrl || sfuUrl === "ws://localhost:8080") {
-          updateStatus("警告：请配置实际的 SFU 服务器地址");
-        }
-
-        updateStatus("正在连接...");
-
-        // 创建客户端，配置 SFU 模式
-        client = new RTCClient({
-          signalingUrl,
-          autoConnect: true,
-          architectureMode: "sfu", // 使用 SFU 模式
-          sfuOptions: {
-            url: sfuUrl, // SFU 服务器地址
-          },
-        });
-
-        // 更新显示
-        architectureModeSpan.textContent = "SFU";
-        sfuServerUrlSpan.textContent = sfuUrl || "未配置";
-
-        // 监听连接状态
-        client.on("connection-state-change", (state) => {
-          updateStatus(`连接状态: ${state}`);
-          updateButtons(state === "connected", false);
-          sfuConnectionStateSpan.textContent = state;
-        });
-
-        // 监听 ICE 连接状态
-        client.on("ice-connection-state-change", (state) => {
-          updateStatus(`ICE 连接状态: ${state}`);
-        });
-
-        // 监听用户加入/离开
-        client.on("user-joined", (data) => {
-          const userId = data.userId;
-          updateStatus(`用户 ${userId} 加入了房间`);
-          // 更新房间人数（需要通过客户端API获取）
-        });
-
-        client.on("user-left", (data) => {
-          const userId = data.userId;
-          updateStatus(`用户 ${userId} 离开了房间`);
+      /**
+       * 添加视频元素
+       */
+      function addVideoElement(userId, stream, isLocal = false) {
+        // 如果已存在，先移除
+        if (userVideos.has(userId)) {
           removeVideoElement(userId);
-        });
+        }
 
-        // 监听媒体流（SFU 模式下，每个用户的流是独立的）
-        client.on("stream", (data) => {
-          // SFU 模式下，data 是 { userId, stream }
-          if (data.userId && data.stream) {
+        const videoItem = document.createElement("div");
+        videoItem.className = `video-item ${isLocal ? "local" : ""}`;
+        videoItem.id = `video-${userId}`;
+
+        const label = document.createElement("div");
+        label.className = "video-label";
+        label.textContent = isLocal ? "本地 (我)" : `用户: ${userId}`;
+
+        const video = document.createElement("video");
+        video.autoplay = true;
+        video.playsinline = true;
+        video.muted = isLocal; // 本地视频静音避免回音
+        video.srcObject = stream;
+
+        videoItem.appendChild(label);
+        videoItem.appendChild(video);
+        videosContainer.appendChild(videoItem);
+
+        userVideos.set(userId, { element: videoItem, stream });
+      }
+
+      /**
+       * 移除视频元素
+       */
+      function removeVideoElement(userId) {
+        const videoData = userVideos.get(userId);
+        if (videoData) {
+          // 停止所有轨道
+          if (videoData.stream) {
+            videoData.stream.getTracks().forEach((track) =>
+              track.stop()
+            );
+          }
+          // 移除DOM元素
+          videoData.element.remove();
+          userVideos.delete(userId);
+        }
+      }
+
+      /**
+       * 连接按钮事件
+       */
+      connectBtn.addEventListener("click", async () => {
+        try {
+          const signalingUrl = signalingUrlInput.value;
+          const sfuUrl = sfuUrlInput.value;
+
+          if (!sfuUrl || sfuUrl === "ws://localhost:8080") {
+            updateStatus("警告：请配置实际的 SFU 服务器地址");
+          }
+
+          updateStatus("正在连接...");
+
+          // 创建客户端，配置 SFU 模式
+          client = new RTCClient({
+            signalingUrl,
+            autoConnect: true,
+            architectureMode: "sfu", // 使用 SFU 模式
+            sfuOptions: {
+              url: sfuUrl, // SFU 服务器地址
+            },
+          });
+
+          // 更新显示
+          architectureModeSpan.textContent = "SFU";
+          sfuServerUrlSpan.textContent = sfuUrl || "未配置";
+
+          // 监听连接状态
+          client.on("connection-state-change", (state) => {
+            updateStatus(`连接状态: ${state}`);
+            updateButtons(state === "connected", false);
+            sfuConnectionStateSpan.textContent = state;
+          });
+
+          // 监听 ICE 连接状态
+          client.on("ice-connection-state-change", (state) => {
+            updateStatus(`ICE 连接状态: ${state}`);
+          });
+
+          // 监听用户加入/离开
+          client.on("user-joined", (data) => {
             const userId = data.userId;
-            const stream = data.stream;
-            const isLocal = userId === client.userId;
+            updateStatus(`用户 ${userId} 加入了房间`);
+            // 更新房间人数（需要通过客户端API获取）
+          });
 
-            updateStatus(`收到用户 ${userId} 的媒体流（SFU 模式）`);
-            addVideoElement(userId, stream, isLocal);
-          } else {
-            // 兼容点对点模式
-            const stream = data;
-            const localStream = client.getLocalStream();
-            if (stream.id === localStream?.id) {
-              addVideoElement("local", stream, true);
+          client.on("user-left", (data) => {
+            const userId = data.userId;
+            updateStatus(`用户 ${userId} 离开了房间`);
+            removeVideoElement(userId);
+          });
+
+          // 监听媒体流（SFU 模式下，每个用户的流是独立的）
+          client.on("stream", (data) => {
+            // SFU 模式下，data 是 { userId, stream }
+            if (data.userId && data.stream) {
+              const userId = data.userId;
+              const stream = data.stream;
+              const isLocal = userId === client.userId;
+
+              updateStatus(`收到用户 ${userId} 的媒体流（SFU 模式）`);
+              addVideoElement(userId, stream, isLocal);
             } else {
-              addVideoElement("remote", stream, false);
+              // 兼容点对点模式
+              const stream = data;
+              const localStream = client.getLocalStream();
+              if (stream.id === localStream?.id) {
+                addVideoElement("local", stream, true);
+              } else {
+                addVideoElement("remote", stream, false);
+              }
+            }
+          });
+
+          // 监听错误
+          client.on("error", (error) => {
+            updateStatus(`错误: ${error.message}`);
+            console.error("WebRTC 错误:", error);
+          });
+
+          updateStatus("客户端已创建（SFU 模式），等待连接...");
+        } catch (error) {
+          updateStatus(`连接失败: ${error.message}`);
+          console.error("连接错误:", error);
+        }
+      });
+
+      /**
+       * 加入房间按钮事件
+       */
+      joinRoomBtn.addEventListener("click", async () => {
+        try {
+          const roomId = roomIdInput.value;
+          let userId = userIdInput.value;
+
+          // 如果用户ID为空，生成一个随机ID
+          if (!userId || userId === "user-") {
+            userId = `user-${Math.random().toString(36).substr(2, 9)}`;
+            userIdInput.value = userId;
+          }
+
+          updateStatus(`正在加入房间 ${roomId}（SFU 模式）...`);
+
+          // 获取本地媒体流
+          const localStream = await client.getUserMedia({
+            video: true,
+            audio: true,
+          });
+          addVideoElement(userId, localStream, true);
+
+          // 加入房间（SFU 模式下会自动使用 SFU 连接）
+          await client.joinRoom(roomId, userId);
+          updateStatus(
+            `已加入房间 ${roomId}，用户ID: ${userId}（SFU 模式）`,
+          );
+          updateButtons(true, true);
+        } catch (error) {
+          updateStatus(`加入房间失败: ${error.message}`);
+          console.error("加入房间错误:", error);
+        }
+      });
+
+      /**
+       * 离开房间按钮事件
+       */
+      leaveRoomBtn.addEventListener("click", async () => {
+        try {
+          await client.leaveRoom();
+          updateStatus("已离开房间");
+
+          // 清理所有远程视频
+          const localUserId = client.userId;
+          for (const [userId] of userVideos) {
+            if (userId !== localUserId) {
+              removeVideoElement(userId);
             }
           }
-        });
 
-        // 监听错误
-        client.on("error", (error) => {
-          updateStatus(`错误: ${error.message}`);
-          console.error("WebRTC 错误:", error);
-        });
-
-        updateStatus("客户端已创建（SFU 模式），等待连接...");
-      } catch (error) {
-        updateStatus(`连接失败: ${error.message}`);
-        console.error("连接错误:", error);
-      }
-    });
-
-    /**
-     * 加入房间按钮事件
-     */
-    joinRoomBtn.addEventListener("click", async () => {
-      try {
-        const roomId = roomIdInput.value;
-        let userId = userIdInput.value;
-
-        // 如果用户ID为空，生成一个随机ID
-        if (!userId || userId === "user-") {
-          userId = `user-${Math.random().toString(36).substr(2, 9)}`;
-          userIdInput.value = userId;
+          updateButtons(true, false);
+          roomUserCountSpan.textContent = "0";
+        } catch (error) {
+          updateStatus(`离开房间失败: ${error.message}`);
+          console.error("离开房间错误:", error);
         }
+      });
 
-        updateStatus(`正在加入房间 ${roomId}（SFU 模式）...`);
+      /**
+       * 断开连接按钮事件
+       */
+      disconnectBtn.addEventListener("click", async () => {
+        try {
+          await client.disconnect();
+          updateStatus("已断开连接");
 
-        // 获取本地媒体流
-        const localStream = await client.getUserMedia({ video: true, audio: true });
-        addVideoElement(userId, localStream, true);
-
-        // 加入房间（SFU 模式下会自动使用 SFU 连接）
-        await client.joinRoom(roomId, userId);
-        updateStatus(`已加入房间 ${roomId}，用户ID: ${userId}（SFU 模式）`);
-        updateButtons(true, true);
-      } catch (error) {
-        updateStatus(`加入房间失败: ${error.message}`);
-        console.error("加入房间错误:", error);
-      }
-    });
-
-    /**
-     * 离开房间按钮事件
-     */
-    leaveRoomBtn.addEventListener("click", async () => {
-      try {
-        await client.leaveRoom();
-        updateStatus("已离开房间");
-
-        // 清理所有远程视频
-        const localUserId = client.userId;
-        for (const [userId] of userVideos) {
-          if (userId !== localUserId) {
+          // 清理所有视频
+          for (const [userId] of userVideos) {
             removeVideoElement(userId);
           }
+
+          updateButtons(false, false);
+          client = null;
+          sfuConnectionStateSpan.textContent = "未连接";
+          roomUserCountSpan.textContent = "0";
+        } catch (error) {
+          updateStatus(`断开连接失败: ${error.message}`);
+          console.error("断开连接错误:", error);
         }
+      });
 
-        updateButtons(true, false);
-        roomUserCountSpan.textContent = "0";
-      } catch (error) {
-        updateStatus(`离开房间失败: ${error.message}`);
-        console.error("离开房间错误:", error);
-      }
-    });
-
-    /**
-     * 断开连接按钮事件
-     */
-    disconnectBtn.addEventListener("click", async () => {
-      try {
-        await client.disconnect();
-        updateStatus("已断开连接");
-
-        // 清理所有视频
-        for (const [userId] of userVideos) {
-          removeVideoElement(userId);
-        }
-
-        updateButtons(false, false);
-        client = null;
-        sfuConnectionStateSpan.textContent = "未连接";
-        roomUserCountSpan.textContent = "0";
-      } catch (error) {
-        updateStatus(`断开连接失败: ${error.message}`);
-        console.error("断开连接错误:", error);
-      }
-    });
-
-    // 初始化按钮状态
-    updateButtons(false, false);
-  </script>
-</body>
+      // 初始化按钮状态
+      updateButtons(false, false);
+    </script>
+  </body>
 </html>

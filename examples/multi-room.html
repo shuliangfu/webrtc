@@ -1,400 +1,419 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WebRTC 多人房间通话示例</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      max-width: 1400px;
-      margin: 0 auto;
-      padding: 20px;
-    }
-    .controls {
-      margin-bottom: 20px;
-      padding: 15px;
-      background: #f5f5f5;
-      border-radius: 8px;
-      display: flex;
-      gap: 15px;
-      flex-wrap: wrap;
-      align-items: center;
-    }
-    .controls label {
-      display: flex;
-      flex-direction: column;
-      gap: 5px;
-    }
-    .controls input {
-      padding: 8px;
-      font-size: 14px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-    }
-    button {
-      padding: 10px 20px;
-      font-size: 16px;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      background: #007bff;
-      color: white;
-    }
-    button:hover {
-      background: #0056b3;
-    }
-    button:disabled {
-      background: #ccc;
-      cursor: not-allowed;
-    }
-    .status {
-      margin-bottom: 20px;
-      padding: 10px;
-      background: #e3f2fd;
-      border-radius: 4px;
-      font-weight: bold;
-    }
-    .videos-container {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-      gap: 20px;
-    }
-    .video-item {
-      position: relative;
-      border: 2px solid #ddd;
-      border-radius: 8px;
-      overflow: hidden;
-      background: #000;
-    }
-    .video-item.local {
-      border-color: #4caf50;
-    }
-    video {
-      width: 100%;
-      height: auto;
-      display: block;
-    }
-    .video-label {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      background: rgba(0, 0, 0, 0.7);
-      color: white;
-      padding: 5px 10px;
-      border-radius: 4px;
-      font-size: 12px;
-      z-index: 10;
-    }
-    .users-list {
-      margin-top: 20px;
-      padding: 15px;
-      background: #f9f9f9;
-      border-radius: 8px;
-    }
-    .users-list h3 {
-      margin-top: 0;
-    }
-    .user-item {
-      padding: 8px;
-      margin: 5px 0;
-      background: white;
-      border-radius: 4px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-  </style>
-</head>
-<body>
-  <h1>WebRTC 多人房间通话示例</h1>
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebRTC 多人房间通话示例</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      .controls {
+        margin-bottom: 20px;
+        padding: 15px;
+        background: #f5f5f5;
+        border-radius: 8px;
+        display: flex;
+        gap: 15px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+      .controls label {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+      .controls input {
+        padding: 8px;
+        font-size: 14px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+      }
+      button {
+        padding: 10px 20px;
+        font-size: 16px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        background: #007bff;
+        color: white;
+      }
+      button:hover {
+        background: #0056b3;
+      }
+      button:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+      }
+      .status {
+        margin-bottom: 20px;
+        padding: 10px;
+        background: #e3f2fd;
+        border-radius: 4px;
+        font-weight: bold;
+      }
+      .videos-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 20px;
+      }
+      .video-item {
+        position: relative;
+        border: 2px solid #ddd;
+        border-radius: 8px;
+        overflow: hidden;
+        background: #000;
+      }
+      .video-item.local {
+        border-color: #4caf50;
+      }
+      video {
+        width: 100%;
+        height: auto;
+        display: block;
+      }
+      .video-label {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 5px 10px;
+        border-radius: 4px;
+        font-size: 12px;
+        z-index: 10;
+      }
+      .users-list {
+        margin-top: 20px;
+        padding: 15px;
+        background: #f9f9f9;
+        border-radius: 8px;
+      }
+      .users-list h3 {
+        margin-top: 0;
+      }
+      .user-item {
+        padding: 8px;
+        margin: 5px 0;
+        background: white;
+        border-radius: 4px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>WebRTC 多人房间通话示例</h1>
 
-  <div class="controls">
-    <label>
-      信令服务器 URL:
-      <input type="text" id="signalingUrl" value="http://localhost:3000" style="width: 250px;">
-    </label>
-    <label>
-      房间 ID:
-      <input type="text" id="roomId" value="multi-room-123" style="width: 150px;">
-    </label>
-    <label>
-      用户 ID:
-      <input type="text" id="userId" value="user-" style="width: 150px;">
-    </label>
-    <button type="button" id="connectBtn">连接</button>
-    <button type="button" id="joinRoomBtn" disabled>加入房间</button>
-    <button type="button" id="leaveRoomBtn" disabled>离开房间</button>
-    <button type="button" id="disconnectBtn" disabled>断开连接</button>
-  </div>
+    <div class="controls">
+      <label>
+        信令服务器 URL:
+        <input
+          type="text"
+          id="signalingUrl"
+          value="http://localhost:3000"
+          style="width: 250px"
+        >
+      </label>
+      <label>
+        房间 ID:
+        <input
+          type="text"
+          id="roomId"
+          value="multi-room-123"
+          style="width: 150px"
+        >
+      </label>
+      <label>
+        用户 ID:
+        <input type="text" id="userId" value="user-" style="width: 150px">
+      </label>
+      <button type="button" id="connectBtn">连接</button>
+      <button type="button" id="joinRoomBtn" disabled>加入房间</button>
+      <button type="button" id="leaveRoomBtn" disabled>离开房间</button>
+      <button type="button" id="disconnectBtn" disabled>断开连接</button>
+    </div>
 
-  <div class="status" id="status">未连接</div>
+    <div class="status" id="status">未连接</div>
 
-  <div class="users-list">
-    <h3>房间用户列表</h3>
-    <div id="usersList">暂无用户</div>
-  </div>
+    <div class="users-list">
+      <h3>房间用户列表</h3>
+      <div id="usersList">暂无用户</div>
+    </div>
 
-  <div class="videos-container" id="videosContainer">
-    <!-- 视频元素将动态添加到这里 -->
-  </div>
+    <div class="videos-container" id="videosContainer">
+      <!-- 视频元素将动态添加到这里 -->
+    </div>
 
-  <script type="module">
-    // 使用 esm.sh 提供的 npm 镜像（浏览器环境）
-    import { RTCClient } from "https://esm.sh/@jsr/dreamer__webrtc@1.0.0-beta.1/es2022/client.bundle.mjs";
+    <script type="module">
+      // 使用 esm.sh 提供的 npm 镜像（浏览器环境）
+      import { RTCClient } from "https://esm.sh/@jsr/dreamer__webrtc@1.0.0-beta.1/es2022/client.bundle.mjs";
 
-    const signalingUrlInput = document.getElementById("signalingUrl");
-    const roomIdInput = document.getElementById("roomId");
-    const userIdInput = document.getElementById("userId");
-    const connectBtn = document.getElementById("connectBtn");
-    const joinRoomBtn = document.getElementById("joinRoomBtn");
-    const leaveRoomBtn = document.getElementById("leaveRoomBtn");
-    const disconnectBtn = document.getElementById("disconnectBtn");
-    const statusDiv = document.getElementById("status");
-    const videosContainer = document.getElementById("videosContainer");
-    const usersListDiv = document.getElementById("usersList");
+      const signalingUrlInput = document.getElementById("signalingUrl");
+      const roomIdInput = document.getElementById("roomId");
+      const userIdInput = document.getElementById("userId");
+      const connectBtn = document.getElementById("connectBtn");
+      const joinRoomBtn = document.getElementById("joinRoomBtn");
+      const leaveRoomBtn = document.getElementById("leaveRoomBtn");
+      const disconnectBtn = document.getElementById("disconnectBtn");
+      const statusDiv = document.getElementById("status");
+      const videosContainer = document.getElementById(
+        "videosContainer",
+      );
+      const usersListDiv = document.getElementById("usersList");
 
-    let client = null;
-    const userVideos = new Map(); // 存储用户ID和视频元素的映射
+      let client = null;
+      const userVideos = new Map(); // 存储用户ID和视频元素的映射
 
-    /**
-     * 更新状态显示
-     */
-    function updateStatus(message) {
-      statusDiv.textContent = message;
-      console.log(message);
-    }
-
-    /**
-     * 更新按钮状态
-     */
-    function updateButtons(connected, inRoom) {
-      connectBtn.disabled = connected;
-      joinRoomBtn.disabled = !connected || inRoom;
-      leaveRoomBtn.disabled = !inRoom;
-      disconnectBtn.disabled = !connected;
-    }
-
-    /**
-     * 添加视频元素
-     */
-    function addVideoElement(userId, stream, isLocal = false) {
-      // 如果已存在，先移除
-      if (userVideos.has(userId)) {
-        removeVideoElement(userId);
+      /**
+       * 更新状态显示
+       */
+      function updateStatus(message) {
+        statusDiv.textContent = message;
+        console.log(message);
       }
 
-      const videoItem = document.createElement("div");
-      videoItem.className = `video-item ${isLocal ? "local" : ""}`;
-      videoItem.id = `video-${userId}`;
+      /**
+       * 更新按钮状态
+       */
+      function updateButtons(connected, inRoom) {
+        connectBtn.disabled = connected;
+        joinRoomBtn.disabled = !connected || inRoom;
+        leaveRoomBtn.disabled = !inRoom;
+        disconnectBtn.disabled = !connected;
+      }
 
-      const label = document.createElement("div");
-      label.className = "video-label";
-      label.textContent = isLocal ? "本地 (我)" : `用户: ${userId}`;
-
-      const video = document.createElement("video");
-      video.autoplay = true;
-      video.playsinline = true;
-      video.muted = isLocal; // 本地视频静音避免回音
-      video.srcObject = stream;
-
-      videoItem.appendChild(label);
-      videoItem.appendChild(video);
-      videosContainer.appendChild(videoItem);
-
-      userVideos.set(userId, { element: videoItem, stream });
-    }
-
-    /**
-     * 移除视频元素
-     */
-    function removeVideoElement(userId) {
-      const videoData = userVideos.get(userId);
-      if (videoData) {
-        // 停止所有轨道
-        if (videoData.stream) {
-          videoData.stream.getTracks().forEach(track => track.stop());
+      /**
+       * 添加视频元素
+       */
+      function addVideoElement(userId, stream, isLocal = false) {
+        // 如果已存在，先移除
+        if (userVideos.has(userId)) {
+          removeVideoElement(userId);
         }
-        // 移除DOM元素
-        videoData.element.remove();
-        userVideos.delete(userId);
-      }
-    }
 
-    /**
-     * 更新用户列表
-     */
-    function updateUsersList(users) {
-      if (users.length === 0) {
-        usersListDiv.textContent = "暂无用户";
-        return;
+        const videoItem = document.createElement("div");
+        videoItem.className = `video-item ${isLocal ? "local" : ""}`;
+        videoItem.id = `video-${userId}`;
+
+        const label = document.createElement("div");
+        label.className = "video-label";
+        label.textContent = isLocal ? "本地 (我)" : `用户: ${userId}`;
+
+        const video = document.createElement("video");
+        video.autoplay = true;
+        video.playsinline = true;
+        video.muted = isLocal; // 本地视频静音避免回音
+        video.srcObject = stream;
+
+        videoItem.appendChild(label);
+        videoItem.appendChild(video);
+        videosContainer.appendChild(videoItem);
+
+        userVideos.set(userId, { element: videoItem, stream });
       }
 
-      usersListDiv.innerHTML = users.map(userId => {
-        const hasVideo = userVideos.has(userId);
-        return `
+      /**
+       * 移除视频元素
+       */
+      function removeVideoElement(userId) {
+        const videoData = userVideos.get(userId);
+        if (videoData) {
+          // 停止所有轨道
+          if (videoData.stream) {
+            videoData.stream.getTracks().forEach((track) =>
+              track.stop()
+            );
+          }
+          // 移除DOM元素
+          videoData.element.remove();
+          userVideos.delete(userId);
+        }
+      }
+
+      /**
+       * 更新用户列表
+       */
+      function updateUsersList(users) {
+        if (users.length === 0) {
+          usersListDiv.textContent = "暂无用户";
+          return;
+        }
+
+        usersListDiv.innerHTML = users.map((userId) => {
+          const hasVideo = userVideos.has(userId);
+          return `
           <div class="user-item">
             <span>${userId}</span>
-            <span style="color: ${hasVideo ? '#4caf50' : '#999'}">
-              ${hasVideo ? '✓ 已连接' : '等待连接'}
+            <span style="color: ${hasVideo ? "#4caf50" : "#999"}">
+              ${hasVideo ? "✓ 已连接" : "等待连接"}
             </span>
           </div>
         `;
-      }).join("");
-    }
+        }).join("");
+      }
 
-    /**
-     * 连接按钮事件
-     */
-    connectBtn.addEventListener("click", async () => {
-      try {
-        const signalingUrl = signalingUrlInput.value;
-        updateStatus("正在连接...");
+      /**
+       * 连接按钮事件
+       */
+      connectBtn.addEventListener("click", async () => {
+        try {
+          const signalingUrl = signalingUrlInput.value;
+          updateStatus("正在连接...");
 
-        client = new RTCClient({
-          signalingUrl,
-          autoConnect: true,
-        });
+          client = new RTCClient({
+            signalingUrl,
+            autoConnect: true,
+          });
 
-        // 监听连接状态
-        client.on("connection-state-change", (state) => {
-          updateStatus(`连接状态: ${state}`);
-          updateButtons(state === "connected", false);
-        });
+          // 监听连接状态
+          client.on("connection-state-change", (state) => {
+            updateStatus(`连接状态: ${state}`);
+            updateButtons(state === "connected", false);
+          });
 
-        // 监听 ICE 连接状态
-        client.on("ice-connection-state-change", (state) => {
-          updateStatus(`ICE 连接状态: ${state}`);
-        });
+          // 监听 ICE 连接状态
+          client.on("ice-connection-state-change", (state) => {
+            updateStatus(`ICE 连接状态: ${state}`);
+          });
 
-        // 监听用户加入/离开房间
-        client.on("user-joined", (data) => {
-          const userId = data.userId;
-          updateStatus(`用户 ${userId} 加入了房间`);
-          updateUsersList([...userVideos.keys(), userId]);
-        });
-
-        client.on("user-left", (data) => {
-          const userId = data.userId;
-          updateStatus(`用户 ${userId} 离开了房间`);
-          removeVideoElement(userId);
-          updateUsersList([...userVideos.keys()].filter(id => id !== userId));
-        });
-
-        // 监听媒体流（多人房间模式）
-        client.on("stream", (data) => {
-          // 多人房间模式下，data 是 { userId, stream }
-          if (data.userId && data.stream) {
+          // 监听用户加入/离开房间
+          client.on("user-joined", (data) => {
             const userId = data.userId;
-            const stream = data.stream;
-            const isLocal = userId === client.userId;
+            updateStatus(`用户 ${userId} 加入了房间`);
+            updateUsersList([...userVideos.keys(), userId]);
+          });
 
-            updateStatus(`收到用户 ${userId} 的媒体流`);
-            addVideoElement(userId, stream, isLocal);
-            updateUsersList([...userVideos.keys()]);
-          } else {
-            // 兼容点对点模式
-            const stream = data;
-            const localStream = client.getLocalStream();
-            if (stream.id === localStream?.id) {
-              addVideoElement("local", stream, true);
+          client.on("user-left", (data) => {
+            const userId = data.userId;
+            updateStatus(`用户 ${userId} 离开了房间`);
+            removeVideoElement(userId);
+            updateUsersList(
+              [...userVideos.keys()].filter((id) => id !== userId),
+            );
+          });
+
+          // 监听媒体流（多人房间模式）
+          client.on("stream", (data) => {
+            // 多人房间模式下，data 是 { userId, stream }
+            if (data.userId && data.stream) {
+              const userId = data.userId;
+              const stream = data.stream;
+              const isLocal = userId === client.userId;
+
+              updateStatus(`收到用户 ${userId} 的媒体流`);
+              addVideoElement(userId, stream, isLocal);
+              updateUsersList([...userVideos.keys()]);
             } else {
-              addVideoElement("remote", stream, false);
+              // 兼容点对点模式
+              const stream = data;
+              const localStream = client.getLocalStream();
+              if (stream.id === localStream?.id) {
+                addVideoElement("local", stream, true);
+              } else {
+                addVideoElement("remote", stream, false);
+              }
+            }
+          });
+
+          // 监听错误
+          client.on("error", (error) => {
+            updateStatus(`错误: ${error.message}`);
+            console.error("WebRTC 错误:", error);
+          });
+
+          updateStatus("客户端已创建，等待连接...");
+        } catch (error) {
+          updateStatus(`连接失败: ${error.message}`);
+          console.error("连接错误:", error);
+        }
+      });
+
+      /**
+       * 加入房间按钮事件
+       */
+      joinRoomBtn.addEventListener("click", async () => {
+        try {
+          const roomId = roomIdInput.value;
+          let userId = userIdInput.value;
+
+          // 如果用户ID为空，生成一个随机ID
+          if (!userId || userId === "user-") {
+            userId = `user-${Math.random().toString(36).substr(2, 9)}`;
+            userIdInput.value = userId;
+          }
+
+          updateStatus(`正在加入房间 ${roomId}...`);
+
+          // 获取本地媒体流
+          const localStream = await client.getUserMedia({
+            video: true,
+            audio: true,
+          });
+          addVideoElement(userId, localStream, true);
+
+          // 加入房间（启用多人房间模式）
+          await client.joinRoom(roomId, userId, true);
+          updateStatus(`已加入房间 ${roomId}，用户ID: ${userId}`);
+          updateButtons(true, true);
+        } catch (error) {
+          updateStatus(`加入房间失败: ${error.message}`);
+          console.error("加入房间错误:", error);
+        }
+      });
+
+      /**
+       * 离开房间按钮事件
+       */
+      leaveRoomBtn.addEventListener("click", async () => {
+        try {
+          await client.leaveRoom();
+          updateStatus("已离开房间");
+
+          // 清理所有远程视频
+          const localUserId = client.userId;
+          for (const [userId] of userVideos) {
+            if (userId !== localUserId) {
+              removeVideoElement(userId);
             }
           }
-        });
 
-        // 监听错误
-        client.on("error", (error) => {
-          updateStatus(`错误: ${error.message}`);
-          console.error("WebRTC 错误:", error);
-        });
-
-        updateStatus("客户端已创建，等待连接...");
-      } catch (error) {
-        updateStatus(`连接失败: ${error.message}`);
-        console.error("连接错误:", error);
-      }
-    });
-
-    /**
-     * 加入房间按钮事件
-     */
-    joinRoomBtn.addEventListener("click", async () => {
-      try {
-        const roomId = roomIdInput.value;
-        let userId = userIdInput.value;
-
-        // 如果用户ID为空，生成一个随机ID
-        if (!userId || userId === "user-") {
-          userId = `user-${Math.random().toString(36).substr(2, 9)}`;
-          userIdInput.value = userId;
+          updateButtons(true, false);
+          usersListDiv.textContent = "暂无用户";
+        } catch (error) {
+          updateStatus(`离开房间失败: ${error.message}`);
+          console.error("离开房间错误:", error);
         }
+      });
 
-        updateStatus(`正在加入房间 ${roomId}...`);
+      /**
+       * 断开连接按钮事件
+       */
+      disconnectBtn.addEventListener("click", async () => {
+        try {
+          await client.disconnect();
+          updateStatus("已断开连接");
 
-        // 获取本地媒体流
-        const localStream = await client.getUserMedia({ video: true, audio: true });
-        addVideoElement(userId, localStream, true);
-
-        // 加入房间（启用多人房间模式）
-        await client.joinRoom(roomId, userId, true);
-        updateStatus(`已加入房间 ${roomId}，用户ID: ${userId}`);
-        updateButtons(true, true);
-      } catch (error) {
-        updateStatus(`加入房间失败: ${error.message}`);
-        console.error("加入房间错误:", error);
-      }
-    });
-
-    /**
-     * 离开房间按钮事件
-     */
-    leaveRoomBtn.addEventListener("click", async () => {
-      try {
-        await client.leaveRoom();
-        updateStatus("已离开房间");
-
-        // 清理所有远程视频
-        const localUserId = client.userId;
-        for (const [userId] of userVideos) {
-          if (userId !== localUserId) {
+          // 清理所有视频
+          for (const [userId] of userVideos) {
             removeVideoElement(userId);
           }
+
+          updateButtons(false, false);
+          client = null;
+          usersListDiv.textContent = "暂无用户";
+        } catch (error) {
+          updateStatus(`断开连接失败: ${error.message}`);
+          console.error("断开连接错误:", error);
         }
+      });
 
-        updateButtons(true, false);
-        usersListDiv.textContent = "暂无用户";
-      } catch (error) {
-        updateStatus(`离开房间失败: ${error.message}`);
-        console.error("离开房间错误:", error);
-      }
-    });
-
-    /**
-     * 断开连接按钮事件
-     */
-    disconnectBtn.addEventListener("click", async () => {
-      try {
-        await client.disconnect();
-        updateStatus("已断开连接");
-
-        // 清理所有视频
-        for (const [userId] of userVideos) {
-          removeVideoElement(userId);
-        }
-
-        updateButtons(false, false);
-        client = null;
-        usersListDiv.textContent = "暂无用户";
-      } catch (error) {
-        updateStatus(`断开连接失败: ${error.message}`);
-        console.error("断开连接错误:", error);
-      }
-    });
-
-    // 初始化按钮状态
-    updateButtons(false, false);
-  </script>
-</body>
+      // 初始化按钮状态
+      updateButtons(false, false);
+    </script>
+  </body>
 </html>

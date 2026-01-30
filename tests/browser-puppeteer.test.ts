@@ -10,7 +10,11 @@
 import { RUNTIME } from "@dreamer/runtime-adapter";
 import { afterAll, beforeAll, describe, expect, it } from "@dreamer/test";
 import { SignalingServer } from "../src/server/mod.ts";
-import { delay, getAvailablePortAsync, waitForServerReady } from "./test-utils.ts";
+import {
+  delay,
+  getAvailablePortAsync,
+  waitForServerReady,
+} from "./test-utils.ts";
 
 // 服务器相关变量
 let server: SignalingServer | null = null;
@@ -62,7 +66,9 @@ const browserConfig = {
 describe(`WebRTC - 浏览器测试 (${RUNTIME})`, () => {
   // 在所有测试前启动信令服务器
   beforeAll(async () => {
-    console.log(`[${RUNTIME}] beforeAll 启动信令服务器.......................1`);
+    console.log(
+      `[${RUNTIME}] beforeAll 启动信令服务器.......................1`,
+    );
     testPort = await getAvailablePortAsync();
     serverUrl = `http://localhost:${testPort}`;
     server = new SignalingServer({
@@ -77,7 +83,6 @@ describe(`WebRTC - 浏览器测试 (${RUNTIME})`, () => {
   // 在所有测试后关闭信令服务器
   afterAll(async () => {
     console.log(`[${RUNTIME}] afterAll 关闭信令服务器.......................2`);
-
 
     if (server) {
       await server.close();

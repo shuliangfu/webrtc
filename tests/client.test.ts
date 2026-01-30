@@ -104,7 +104,8 @@ describe("RTCClient", () => {
     }, { timeout: 15000 });
 
     it("应该自动连接", async () => {
-      const hasRTC = typeof (globalThis as { RTCPeerConnection?: unknown }).RTCPeerConnection !==
+      const hasRTC = typeof (globalThis as { RTCPeerConnection?: unknown })
+        .RTCPeerConnection !==
         "undefined";
       const client = new RTCClient({
         signalingUrl: serverUrl,
@@ -114,7 +115,9 @@ describe("RTCClient", () => {
       if (hasRTC) {
         // 有 WebRTC（如 Deno/浏览器）：等待信令连接成功，断言状态为 connected
         const deadline = Date.now() + 8_000;
-        while (client.getConnectionState() !== "connected" && Date.now() < deadline) {
+        while (
+          client.getConnectionState() !== "connected" && Date.now() < deadline
+        ) {
           await delay(200);
         }
         expect(client.getConnectionState()).toBe("connected");

@@ -4,7 +4,12 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it } from "@dreamer/test";
-import { SignalingServer } from "../src/server/mod.ts";
+import { ServiceContainer } from "@dreamer/service";
+import {
+  createWebRTCManager,
+  SignalingServer,
+  WebRTCManager,
+} from "../src/server/mod.ts";
 import {
   delay,
   getAvailablePort,
@@ -168,5 +173,197 @@ describe("SignalingServer", () => {
       expect(suggestion).toBeTruthy();
       expect(["good", "fair", "poor"]).toContain(suggestion.quality);
     }, { timeout: 15000 });
+  });
+});
+
+describe("WebRTCManager", () => {
+  it("应该创建 WebRTCManager 实例", () => {
+    const manager = new WebRTCManager();
+    expect(manager).toBeInstanceOf(WebRTCManager);
+  });
+
+  it("应该获取默认管理器名称", () => {
+    const manager = new WebRTCManager();
+    expect(manager.getName()).toBe("default");
+  });
+
+  it("应该获取自定义管理器名称", () => {
+    const manager = new WebRTCManager({ name: "custom" });
+    expect(manager.getName()).toBe("custom");
+  });
+
+  it("应该注册和获取信令服务器", async () => {
+    const manager = new WebRTCManager();
+    const port = await getAvailablePortAsync();
+    manager.registerServer("main", { port });
+
+    const server = manager.getServer("main");
+    expect(server).toBeInstanceOf(SignalingServer);
+
+    await manager.close();
+  });
+
+  it("应该返回同一个服务器实例", async () => {
+    const manager = new WebRTCManager();
+    const port = await getAvailablePortAsync();
+    manager.registerServer("main", { port });
+
+    const server1 = manager.getServer("main");
+    const server2 = manager.getServer("main");
+    expect(server1).toBe(server2);
+
+    await manager.close();
+  });
+
+  it("应该在未注册配置时抛出错误", () => {
+    const manager = new WebRTCManager();
+    expect(() => manager.getServer("unknown")).toThrow(
+      '未找到名为 "unknown" 的信令服务器配置',
+    );
+  });
+
+  it("应该使用默认配置创建服务器", async () => {
+    const port = await getAvailablePortAsync();
+    const manager = new WebRTCManager({
+      defaultServerConfig: { port },
+    });
+
+    const server = manager.getServer("any");
+    expect(server).toBeInstanceOf(SignalingServer);
+
+    await manager.close();
+  });
+
+  it("应该检查服务器是否存在", async () => {
+    const manager = new WebRTCManager();
+    const port = await getAvailablePortAsync();
+
+    expect(manager.hasServer("main")).toBe(false);
+
+    manager.registerServer("main", { port });
+
+    expect(manager.hasServer("main")).toBe(true);
+  });
+
+  it("应该移除服务器", async () => {
+    const manager = new WebRTCManager();
+    const port = await getAvailablePortAsync();
+    manager.registerServer("main", { port });
+
+    manager.getServer("main"); // 创建实例
+    expect(manager.hasServer("main")).toBe(true);
+
+    await manager.removeServer("main");
+    expect(manager.hasServer("main")).toBe(false);
+  });
+
+  it("应该获取所有服务器名称", async () => {
+    const manager = new WebRTCManager();
+    const port1 = await getAvailablePortAsync();
+    const port2 = await getAvailablePortAsync();
+
+    manager.registerServer("server1", { port: port1 });
+    manager.registerServer("server2", { port: port2 });
+
+    const names = manager.getServerNames();
+    expect(names).toContain("server1");
+    expect(names).toContain("server2");
+  });
+
+  it("应该关闭所有服务器", async () => {
+    const manager = new WebRTCManager();
+    const port = await getAvailablePortAsync();
+    manager.registerServer("main", { port });
+    manager.getServer("main");
+
+    await manager.close();
+    expect(manager.getServerNames()).toContain("main"); // 配置仍在
+  });
+});
+
+describe("WebRTCManager ServiceContainer 集成", () => {
+  it("应该设置和获取服务容器", () => {
+    const manager = new WebRTCManager();
+    const container = new ServiceContainer();
+
+    expect(manager.getContainer()).toBeUndefined();
+
+    manager.setContainer(container);
+    expect(manager.getContainer()).toBe(container);
+  });
+
+  it("应该从服务容器获取 WebRTCManager", () => {
+    const container = new ServiceContainer();
+    const manager = new WebRTCManager({ name: "test" });
+    manager.setContainer(container);
+
+    container.registerSingleton("webrtc:test", () => manager);
+
+    const retrieved = WebRTCManager.fromContainer(container, "test");
+    expect(retrieved).toBe(manager);
+  });
+
+  it("应该在服务不存在时返回 undefined", () => {
+    const container = new ServiceContainer();
+    const retrieved = WebRTCManager.fromContainer(container, "non-existent");
+    expect(retrieved).toBeUndefined();
+  });
+
+  it("应该支持多个 WebRTCManager 实例", () => {
+    const container = new ServiceContainer();
+
+    const prodManager = new WebRTCManager({ name: "prod" });
+    prodManager.setContainer(container);
+
+    const devManager = new WebRTCManager({ name: "dev" });
+    devManager.setContainer(container);
+
+    container.registerSingleton("webrtc:prod", () => prodManager);
+    container.registerSingleton("webrtc:dev", () => devManager);
+
+    expect(WebRTCManager.fromContainer(container, "prod")).toBe(prodManager);
+    expect(WebRTCManager.fromContainer(container, "dev")).toBe(devManager);
+  });
+});
+
+describe("createWebRTCManager 工厂函数", () => {
+  it("应该创建 WebRTCManager 实例", () => {
+    const manager = createWebRTCManager();
+    expect(manager).toBeInstanceOf(WebRTCManager);
+  });
+
+  it("应该使用默认名称", () => {
+    const manager = createWebRTCManager();
+    expect(manager.getName()).toBe("default");
+  });
+
+  it("应该使用自定义名称", () => {
+    const manager = createWebRTCManager({ name: "custom" });
+    expect(manager.getName()).toBe("custom");
+  });
+
+  it("应该能够在服务容器中注册", () => {
+    const container = new ServiceContainer();
+
+    container.registerSingleton(
+      "webrtc:main",
+      () => createWebRTCManager({ name: "main" }),
+    );
+
+    const manager = container.get<WebRTCManager>("webrtc:main");
+    expect(manager).toBeInstanceOf(WebRTCManager);
+    expect(manager.getName()).toBe("main");
+  });
+
+  it("应该支持默认服务器配置", async () => {
+    const port = await getAvailablePortAsync();
+    const manager = createWebRTCManager({
+      defaultServerConfig: { port },
+    });
+
+    const server = manager.getServer("any-name");
+    expect(server).toBeInstanceOf(SignalingServer);
+
+    await manager.close();
   });
 });

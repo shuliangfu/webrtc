@@ -15,6 +15,7 @@ import type {
   SignalingServerOptions,
   UserInfo,
 } from "../types.ts";
+import type { ServiceContainer } from "@dreamer/service";
 
 /**
  * WebRTC 信令服务器
@@ -751,4 +752,163 @@ export class SignalingServer {
       recommendation,
     };
   }
+}
+
+/**
+ * WebRTC 管理器配置选项
+ */
+export interface WebRTCManagerOptions {
+  /** 管理器名称（用于服务容器识别） */
+  name?: string;
+  /** 默认信令服务器配置 */
+  defaultServerConfig?: SignalingServerOptions;
+}
+
+/**
+ * WebRTC 管理器
+ *
+ * 管理多个 SignalingServer 实例，支持不同的配置
+ */
+export class WebRTCManager {
+  /** 信令服务器实例映射表 */
+  private servers: Map<string, SignalingServer> = new Map();
+  /** 服务器配置映射表 */
+  private configs: Map<string, SignalingServerOptions> = new Map();
+  /** 默认服务器配置 */
+  private defaultConfig?: SignalingServerOptions;
+  /** 服务容器实例 */
+  private container?: ServiceContainer;
+  /** 管理器名称 */
+  private readonly managerName: string;
+
+  /**
+   * 创建 WebRTC 管理器实例
+   * @param options 管理器配置选项
+   */
+  constructor(options: WebRTCManagerOptions = {}) {
+    this.managerName = options.name || "default";
+    this.defaultConfig = options.defaultServerConfig;
+  }
+
+  /**
+   * 获取管理器名称
+   * @returns 管理器名称
+   */
+  getName(): string {
+    return this.managerName;
+  }
+
+  /**
+   * 设置服务容器
+   * @param container 服务容器实例
+   */
+  setContainer(container: ServiceContainer): void {
+    this.container = container;
+  }
+
+  /**
+   * 获取服务容器
+   * @returns 服务容器实例，如果未设置则返回 undefined
+   */
+  getContainer(): ServiceContainer | undefined {
+    return this.container;
+  }
+
+  /**
+   * 从服务容器创建 WebRTCManager 实例
+   * @param container 服务容器实例
+   * @param name 管理器名称（默认 "default"）
+   * @returns 关联了服务容器的 WebRTCManager 实例
+   */
+  static fromContainer(
+    container: ServiceContainer,
+    name = "default",
+  ): WebRTCManager | undefined {
+    const serviceName = `webrtc:${name}`;
+    return container.tryGet<WebRTCManager>(serviceName);
+  }
+
+  /**
+   * 注册信令服务器配置
+   * @param name 服务器名称
+   * @param config 服务器配置
+   */
+  registerServer(name: string, config: SignalingServerOptions): void {
+    this.configs.set(name, config);
+  }
+
+  /**
+   * 获取或创建信令服务器
+   * @param name 服务器名称
+   * @returns SignalingServer 实例
+   * @throws {Error} 如果未注册配置且没有默认配置
+   */
+  getServer(name: string): SignalingServer {
+    let server = this.servers.get(name);
+    if (!server) {
+      const config = this.configs.get(name) || this.defaultConfig;
+      if (!config) {
+        throw new Error(`未找到名为 "${name}" 的信令服务器配置`);
+      }
+      server = new SignalingServer(config);
+      this.servers.set(name, server);
+    }
+    return server;
+  }
+
+  /**
+   * 检查是否存在指定名称的服务器
+   * @param name 服务器名称
+   * @returns 是否存在
+   */
+  hasServer(name: string): boolean {
+    return this.servers.has(name) || this.configs.has(name);
+  }
+
+  /**
+   * 移除服务器
+   * @param name 服务器名称
+   */
+  async removeServer(name: string): Promise<void> {
+    const server = this.servers.get(name);
+    if (server) {
+      await server.close();
+      this.servers.delete(name);
+    }
+    this.configs.delete(name);
+  }
+
+  /**
+   * 获取所有服务器名称
+   * @returns 服务器名称数组
+   */
+  getServerNames(): string[] {
+    const names = new Set([
+      ...this.servers.keys(),
+      ...this.configs.keys(),
+    ]);
+    return Array.from(names);
+  }
+
+  /**
+   * 关闭所有服务器
+   */
+  async close(): Promise<void> {
+    for (const server of this.servers.values()) {
+      await server.close();
+    }
+    this.servers.clear();
+  }
+}
+
+/**
+ * 创建 WebRTCManager 的工厂函数
+ * 用于服务容器注册
+ * @param options WebRTC 管理器配置选项
+ * @returns WebRTCManager 实例
+ */
+export function createWebRTCManager(
+  options?: WebRTCManagerOptions,
+): WebRTCManager {
+  return new WebRTCManager(options);
 }

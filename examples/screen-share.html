@@ -1,525 +1,571 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WebRTC 屏幕共享示例</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      max-width: 1400px;
-      margin: 0 auto;
-      padding: 20px;
-    }
-    .controls {
-      margin-bottom: 20px;
-      padding: 15px;
-      background: #f5f5f5;
-      border-radius: 8px;
-      display: flex;
-      gap: 15px;
-      flex-wrap: wrap;
-      align-items: center;
-    }
-    .controls label {
-      display: flex;
-      flex-direction: column;
-      gap: 5px;
-    }
-    .controls input {
-      padding: 8px;
-      font-size: 14px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-    }
-    button {
-      padding: 10px 20px;
-      font-size: 16px;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      background: #007bff;
-      color: white;
-    }
-    button:hover {
-      background: #0056b3;
-    }
-    button:disabled {
-      background: #ccc;
-      cursor: not-allowed;
-    }
-    button.danger {
-      background: #dc3545;
-    }
-    button.danger:hover {
-      background: #c82333;
-    }
-    button.success {
-      background: #28a745;
-    }
-    button.success:hover {
-      background: #218838;
-    }
-    .status {
-      margin-bottom: 20px;
-      padding: 10px;
-      background: #e3f2fd;
-      border-radius: 4px;
-      font-weight: bold;
-    }
-    .videos-container {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 20px;
-      margin-top: 20px;
-    }
-    .video-item {
-      position: relative;
-      border: 2px solid #ddd;
-      border-radius: 8px;
-      overflow: hidden;
-      background: #000;
-    }
-    .video-item.local {
-      border-color: #4caf50;
-    }
-    .video-item.remote {
-      border-color: #2196f3;
-    }
-    video {
-      width: 100%;
-      height: auto;
-      display: block;
-    }
-    .video-label {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      background: rgba(0, 0, 0, 0.7);
-      color: white;
-      padding: 5px 10px;
-      border-radius: 4px;
-      font-size: 12px;
-      z-index: 10;
-    }
-    .video-controls {
-      position: absolute;
-      bottom: 10px;
-      left: 50%;
-      transform: translateX(-50%);
-      display: flex;
-      gap: 10px;
-      z-index: 10;
-    }
-    .video-controls button {
-      padding: 8px 15px;
-      font-size: 14px;
-    }
-    .info-panel {
-      margin-top: 20px;
-      padding: 15px;
-      background: #f9f9f9;
-      border-radius: 8px;
-    }
-    .info-panel h3 {
-      margin-top: 0;
-    }
-    .info-item {
-      padding: 8px;
-      margin: 5px 0;
-      background: white;
-      border-radius: 4px;
-      display: flex;
-      justify-content: space-between;
-    }
-  </style>
-</head>
-<body>
-  <h1>WebRTC 屏幕共享示例</h1>
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebRTC 屏幕共享示例</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      .controls {
+        margin-bottom: 20px;
+        padding: 15px;
+        background: #f5f5f5;
+        border-radius: 8px;
+        display: flex;
+        gap: 15px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+      .controls label {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+      .controls input {
+        padding: 8px;
+        font-size: 14px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+      }
+      button {
+        padding: 10px 20px;
+        font-size: 16px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        background: #007bff;
+        color: white;
+      }
+      button:hover {
+        background: #0056b3;
+      }
+      button:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+      }
+      button.danger {
+        background: #dc3545;
+      }
+      button.danger:hover {
+        background: #c82333;
+      }
+      button.success {
+        background: #28a745;
+      }
+      button.success:hover {
+        background: #218838;
+      }
+      .status {
+        margin-bottom: 20px;
+        padding: 10px;
+        background: #e3f2fd;
+        border-radius: 4px;
+        font-weight: bold;
+      }
+      .videos-container {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        margin-top: 20px;
+      }
+      .video-item {
+        position: relative;
+        border: 2px solid #ddd;
+        border-radius: 8px;
+        overflow: hidden;
+        background: #000;
+      }
+      .video-item.local {
+        border-color: #4caf50;
+      }
+      .video-item.remote {
+        border-color: #2196f3;
+      }
+      video {
+        width: 100%;
+        height: auto;
+        display: block;
+      }
+      .video-label {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 5px 10px;
+        border-radius: 4px;
+        font-size: 12px;
+        z-index: 10;
+      }
+      .video-controls {
+        position: absolute;
+        bottom: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        gap: 10px;
+        z-index: 10;
+      }
+      .video-controls button {
+        padding: 8px 15px;
+        font-size: 14px;
+      }
+      .info-panel {
+        margin-top: 20px;
+        padding: 15px;
+        background: #f9f9f9;
+        border-radius: 8px;
+      }
+      .info-panel h3 {
+        margin-top: 0;
+      }
+      .info-item {
+        padding: 8px;
+        margin: 5px 0;
+        background: white;
+        border-radius: 4px;
+        display: flex;
+        justify-content: space-between;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>WebRTC 屏幕共享示例</h1>
 
-  <div class="controls">
-    <label>
-      信令服务器 URL:
-      <input type="text" id="signalingUrl" value="http://localhost:3000" style="width: 250px;">
-    </label>
-    <label>
-      房间 ID:
-      <input type="text" id="roomId" value="screen-share-room" style="width: 150px;">
-    </label>
-    <label>
-      用户 ID:
-      <input type="text" id="userId" value="user-" style="width: 150px;">
-    </label>
-    <button type="button" id="connectBtn">连接</button>
-    <button type="button" id="joinRoomBtn" disabled>加入房间</button>
-    <button type="button" id="startScreenShareBtn" disabled>开始屏幕共享</button>
-    <button type="button" id="stopScreenShareBtn" disabled class="danger">停止屏幕共享</button>
-    <button type="button" id="switchToCameraBtn" disabled class="success">切换到摄像头</button>
-    <button type="button" id="leaveRoomBtn" disabled>离开房间</button>
-    <button type="button" id="disconnectBtn" disabled>断开连接</button>
-  </div>
+    <div class="controls">
+      <label>
+        信令服务器 URL:
+        <input
+          type="text"
+          id="signalingUrl"
+          value="http://localhost:3000"
+          style="width: 250px"
+        >
+      </label>
+      <label>
+        房间 ID:
+        <input
+          type="text"
+          id="roomId"
+          value="screen-share-room"
+          style="width: 150px"
+        >
+      </label>
+      <label>
+        用户 ID:
+        <input type="text" id="userId" value="user-" style="width: 150px">
+      </label>
+      <button type="button" id="connectBtn">连接</button>
+      <button type="button" id="joinRoomBtn" disabled>加入房间</button>
+      <button type="button" id="startScreenShareBtn" disabled>
+        开始屏幕共享
+      </button>
+      <button type="button" id="stopScreenShareBtn" disabled class="danger">
+        停止屏幕共享
+      </button>
+      <button type="button" id="switchToCameraBtn" disabled class="success">
+        切换到摄像头
+      </button>
+      <button type="button" id="leaveRoomBtn" disabled>离开房间</button>
+      <button type="button" id="disconnectBtn" disabled>断开连接</button>
+    </div>
 
-  <div class="status" id="status">未连接</div>
+    <div class="status" id="status">未连接</div>
 
-  <div class="videos-container">
-    <div class="video-item local">
-      <div class="video-label">本地（我的屏幕/摄像头）</div>
-      <video id="localVideo" autoplay muted playsinline></video>
-      <div class="video-controls">
-        <button type="button" id="toggleLocalVideoBtn" disabled>关闭视频</button>
-        <button type="button" id="toggleLocalAudioBtn" disabled>关闭音频</button>
+    <div class="videos-container">
+      <div class="video-item local">
+        <div class="video-label">本地（我的屏幕/摄像头）</div>
+        <video id="localVideo" autoplay muted playsinline></video>
+        <div class="video-controls">
+          <button type="button" id="toggleLocalVideoBtn" disabled>
+            关闭视频
+          </button>
+          <button type="button" id="toggleLocalAudioBtn" disabled>
+            关闭音频
+          </button>
+        </div>
+      </div>
+      <div class="video-item remote">
+        <div class="video-label">远程（对方的屏幕/摄像头）</div>
+        <video id="remoteVideo" autoplay playsinline></video>
       </div>
     </div>
-    <div class="video-item remote">
-      <div class="video-label">远程（对方的屏幕/摄像头）</div>
-      <video id="remoteVideo" autoplay playsinline></video>
+
+    <div class="info-panel">
+      <h3>屏幕共享信息</h3>
+      <div class="info-item">
+        <span>当前模式：</span>
+        <span id="currentMode">未设置</span>
+      </div>
+      <div class="info-item">
+        <span>本地视频轨道状态：</span>
+        <span id="localVideoTrackStatus">-</span>
+      </div>
+      <div class="info-item">
+        <span>本地音频轨道状态：</span>
+        <span id="localAudioTrackStatus">-</span>
+      </div>
     </div>
-  </div>
 
-  <div class="info-panel">
-    <h3>屏幕共享信息</h3>
-    <div class="info-item">
-      <span>当前模式：</span>
-      <span id="currentMode">未设置</span>
-    </div>
-    <div class="info-item">
-      <span>本地视频轨道状态：</span>
-      <span id="localVideoTrackStatus">-</span>
-    </div>
-    <div class="info-item">
-      <span>本地音频轨道状态：</span>
-      <span id="localAudioTrackStatus">-</span>
-    </div>
-  </div>
+    <script type="module">
+      // 使用 esm.sh 提供的 npm 镜像（浏览器环境）
+      import { RTCClient } from "https://esm.sh/@jsr/dreamer__webrtc@1.0.0-beta.1/es2022/client.bundle.mjs";
 
-  <script type="module">
-    // 使用 esm.sh 提供的 npm 镜像（浏览器环境）
-    import { RTCClient } from "https://esm.sh/@jsr/dreamer__webrtc@1.0.0-beta.1/es2022/client.bundle.mjs";
+      const signalingUrlInput = document.getElementById("signalingUrl");
+      const roomIdInput = document.getElementById("roomId");
+      const userIdInput = document.getElementById("userId");
+      const connectBtn = document.getElementById("connectBtn");
+      const joinRoomBtn = document.getElementById("joinRoomBtn");
+      const startScreenShareBtn = document.getElementById(
+        "startScreenShareBtn",
+      );
+      const stopScreenShareBtn = document.getElementById(
+        "stopScreenShareBtn",
+      );
+      const switchToCameraBtn = document.getElementById(
+        "switchToCameraBtn",
+      );
+      const leaveRoomBtn = document.getElementById("leaveRoomBtn");
+      const disconnectBtn = document.getElementById("disconnectBtn");
+      const toggleLocalVideoBtn = document.getElementById(
+        "toggleLocalVideoBtn",
+      );
+      const toggleLocalAudioBtn = document.getElementById(
+        "toggleLocalAudioBtn",
+      );
+      const statusDiv = document.getElementById("status");
+      const localVideo = document.getElementById("localVideo");
+      const remoteVideo = document.getElementById("remoteVideo");
+      const currentModeSpan = document.getElementById("currentMode");
+      const localVideoTrackStatusSpan = document.getElementById(
+        "localVideoTrackStatus",
+      );
+      const localAudioTrackStatusSpan = document.getElementById(
+        "localAudioTrackStatus",
+      );
 
-    const signalingUrlInput = document.getElementById("signalingUrl");
-    const roomIdInput = document.getElementById("roomId");
-    const userIdInput = document.getElementById("userId");
-    const connectBtn = document.getElementById("connectBtn");
-    const joinRoomBtn = document.getElementById("joinRoomBtn");
-    const startScreenShareBtn = document.getElementById("startScreenShareBtn");
-    const stopScreenShareBtn = document.getElementById("stopScreenShareBtn");
-    const switchToCameraBtn = document.getElementById("switchToCameraBtn");
-    const leaveRoomBtn = document.getElementById("leaveRoomBtn");
-    const disconnectBtn = document.getElementById("disconnectBtn");
-    const toggleLocalVideoBtn = document.getElementById("toggleLocalVideoBtn");
-    const toggleLocalAudioBtn = document.getElementById("toggleLocalAudioBtn");
-    const statusDiv = document.getElementById("status");
-    const localVideo = document.getElementById("localVideo");
-    const remoteVideo = document.getElementById("remoteVideo");
-    const currentModeSpan = document.getElementById("currentMode");
-    const localVideoTrackStatusSpan = document.getElementById("localVideoTrackStatus");
-    const localAudioTrackStatusSpan = document.getElementById("localAudioTrackStatus");
+      let client = null;
+      let currentStream = null;
+      let isScreenSharing = false;
+      let localVideoTrack = null;
+      let localAudioTrack = null;
 
-    let client = null;
-    let currentStream = null;
-    let isScreenSharing = false;
-    let localVideoTrack = null;
-    let localAudioTrack = null;
-
-    /**
-     * 更新状态显示
-     */
-    function updateStatus(message) {
-      statusDiv.textContent = message;
-      console.log(message);
-    }
-
-    /**
-     * 更新按钮状态
-     */
-    function updateButtons(connected, inRoom) {
-      connectBtn.disabled = connected;
-      joinRoomBtn.disabled = !connected || inRoom;
-      startScreenShareBtn.disabled = !inRoom;
-      stopScreenShareBtn.disabled = !inRoom || !isScreenSharing;
-      switchToCameraBtn.disabled = !inRoom || !isScreenSharing;
-      leaveRoomBtn.disabled = !inRoom;
-      disconnectBtn.disabled = !connected;
-      toggleLocalVideoBtn.disabled = !inRoom;
-      toggleLocalAudioBtn.disabled = !inRoom;
-    }
-
-    /**
-     * 更新轨道状态显示
-     */
-    function updateTrackStatus() {
-      if (localVideoTrack) {
-        localVideoTrackStatusSpan.textContent = localVideoTrack.enabled ? "启用" : "禁用";
-      } else {
-        localVideoTrackStatusSpan.textContent = "-";
+      /**
+       * 更新状态显示
+       */
+      function updateStatus(message) {
+        statusDiv.textContent = message;
+        console.log(message);
       }
 
-      if (localAudioTrack) {
-        localAudioTrackStatusSpan.textContent = localAudioTrack.enabled ? "启用" : "禁用";
-      } else {
-        localAudioTrackStatusSpan.textContent = "-";
+      /**
+       * 更新按钮状态
+       */
+      function updateButtons(connected, inRoom) {
+        connectBtn.disabled = connected;
+        joinRoomBtn.disabled = !connected || inRoom;
+        startScreenShareBtn.disabled = !inRoom;
+        stopScreenShareBtn.disabled = !inRoom || !isScreenSharing;
+        switchToCameraBtn.disabled = !inRoom || !isScreenSharing;
+        leaveRoomBtn.disabled = !inRoom;
+        disconnectBtn.disabled = !connected;
+        toggleLocalVideoBtn.disabled = !inRoom;
+        toggleLocalAudioBtn.disabled = !inRoom;
       }
-    }
 
-    /**
-     * 停止当前流
-     */
-    function stopCurrentStream() {
-      if (currentStream) {
-        currentStream.getTracks().forEach(track => track.stop());
-        currentStream = null;
-      }
-      localVideo.srcObject = null;
-      localVideoTrack = null;
-      localAudioTrack = null;
-      updateTrackStatus();
-    }
-
-    /**
-     * 连接按钮事件
-     */
-    connectBtn.addEventListener("click", async () => {
-      try {
-        const signalingUrl = signalingUrlInput.value;
-        updateStatus("正在连接...");
-
-        client = new RTCClient({
-          signalingUrl,
-          autoConnect: true,
-        });
-
-        // 监听连接状态
-        client.on("connection-state-change", (state) => {
-          updateStatus(`连接状态: ${state}`);
-          updateButtons(state === "connected", false);
-        });
-
-        // 监听 ICE 连接状态
-        client.on("ice-connection-state-change", (state) => {
-          updateStatus(`ICE 连接状态: ${state}`);
-        });
-
-        // 监听媒体流
-        client.on("stream", (stream) => {
-          const localStream = client.getLocalStream();
-          if (stream.id === localStream?.id) {
-            // 本地流
-            localVideo.srcObject = stream;
-            localVideoTrack = stream.getVideoTracks()[0] || null;
-            localAudioTrack = stream.getAudioTracks()[0] || null;
-            updateTrackStatus();
-            updateStatus("本地媒体流已设置");
-          } else {
-            // 远程流
-            remoteVideo.srcObject = stream;
-            updateStatus("远程媒体流已设置");
-          }
-        });
-
-        // 监听错误
-        client.on("error", (error) => {
-          updateStatus(`错误: ${error.message}`);
-          console.error("WebRTC 错误:", error);
-        });
-
-        updateStatus("客户端已创建，等待连接...");
-      } catch (error) {
-        updateStatus(`连接失败: ${error.message}`);
-        console.error("连接错误:", error);
-      }
-    });
-
-    /**
-     * 加入房间按钮事件
-     */
-    joinRoomBtn.addEventListener("click", async () => {
-      try {
-        const roomId = roomIdInput.value;
-        let userId = userIdInput.value;
-
-        // 如果用户ID为空，生成一个随机ID
-        if (!userId || userId === "user-") {
-          userId = `user-${Math.random().toString(36).substr(2, 9)}`;
-          userIdInput.value = userId;
-        }
-
-        updateStatus(`正在加入房间 ${roomId}...`);
-
-        // 获取摄像头和麦克风
-        currentStream = await client.getUserMedia({ video: true, audio: true });
-        localVideo.srcObject = currentStream;
-        localVideoTrack = currentStream.getVideoTracks()[0] || null;
-        localAudioTrack = currentStream.getAudioTracks()[0] || null;
-        updateTrackStatus();
-        currentModeSpan.textContent = "摄像头";
-        isScreenSharing = false;
-
-        // 加入房间
-        await client.joinRoom(roomId, userId);
-        updateStatus(`已加入房间 ${roomId}，用户ID: ${userId}`);
-        updateButtons(true, true);
-      } catch (error) {
-        updateStatus(`加入房间失败: ${error.message}`);
-        console.error("加入房间错误:", error);
-      }
-    });
-
-    /**
-     * 开始屏幕共享按钮事件
-     */
-    startScreenShareBtn.addEventListener("click", async () => {
-      try {
-        updateStatus("正在获取屏幕共享权限...");
-
-        // 获取屏幕共享流
-        const screenStream = await client.getDisplayMedia({
-          video: {
-            cursor: "always", // 显示鼠标光标
-            displaySurface: "monitor", // 共享整个屏幕
-          },
-          audio: true, // 同时共享系统音频（如果浏览器支持）
-        });
-
-        // 停止旧的流
-        stopCurrentStream();
-
-        // 设置新的屏幕共享流
-        currentStream = screenStream;
-        localVideo.srcObject = currentStream;
-        localVideoTrack = currentStream.getVideoTracks()[0] || null;
-        localAudioTrack = currentStream.getAudioTracks()[0] || null;
-        updateTrackStatus();
-        currentModeSpan.textContent = "屏幕共享";
-        isScreenSharing = true;
-
-        // 监听屏幕共享停止事件（用户点击浏览器停止按钮）
+      /**
+       * 更新轨道状态显示
+       */
+      function updateTrackStatus() {
         if (localVideoTrack) {
-          localVideoTrack.onended = () => {
-            updateStatus("屏幕共享已停止");
-            stopCurrentStream();
-            currentModeSpan.textContent = "未设置";
-            isScreenSharing = false;
-            updateButtons(true, true);
-
-            // 自动切换回摄像头
-            switchToCamera();
-          };
+          localVideoTrackStatusSpan.textContent =
+            localVideoTrack.enabled ? "启用" : "禁用";
+        } else {
+          localVideoTrackStatusSpan.textContent = "-";
         }
 
-        updateStatus("屏幕共享已开始");
-        updateButtons(true, true);
-      } catch (error) {
-        updateStatus(`开始屏幕共享失败: ${error.message}`);
-        console.error("屏幕共享错误:", error);
+        if (localAudioTrack) {
+          localAudioTrackStatusSpan.textContent =
+            localAudioTrack.enabled ? "启用" : "禁用";
+        } else {
+          localAudioTrackStatusSpan.textContent = "-";
+        }
       }
-    });
 
-    /**
-     * 停止屏幕共享按钮事件
-     */
-    stopScreenShareBtn.addEventListener("click", () => {
-      stopCurrentStream();
-      currentModeSpan.textContent = "未设置";
-      isScreenSharing = false;
-      updateStatus("屏幕共享已停止");
-      updateButtons(true, true);
-    });
+      /**
+       * 停止当前流
+       */
+      function stopCurrentStream() {
+        if (currentStream) {
+          currentStream.getTracks().forEach((track) => track.stop());
+          currentStream = null;
+        }
+        localVideo.srcObject = null;
+        localVideoTrack = null;
+        localAudioTrack = null;
+        updateTrackStatus();
+      }
 
-    /**
-     * 切换到摄像头
-     */
-    async function switchToCamera() {
-      try {
-        updateStatus("正在切换到摄像头...");
+      /**
+       * 连接按钮事件
+       */
+      connectBtn.addEventListener("click", async () => {
+        try {
+          const signalingUrl = signalingUrlInput.value;
+          updateStatus("正在连接...");
 
-        // 获取摄像头和麦克风
-        const cameraStream = await client.getUserMedia({ video: true, audio: true });
+          client = new RTCClient({
+            signalingUrl,
+            autoConnect: true,
+          });
 
-        // 停止旧的流
+          // 监听连接状态
+          client.on("connection-state-change", (state) => {
+            updateStatus(`连接状态: ${state}`);
+            updateButtons(state === "connected", false);
+          });
+
+          // 监听 ICE 连接状态
+          client.on("ice-connection-state-change", (state) => {
+            updateStatus(`ICE 连接状态: ${state}`);
+          });
+
+          // 监听媒体流
+          client.on("stream", (stream) => {
+            const localStream = client.getLocalStream();
+            if (stream.id === localStream?.id) {
+              // 本地流
+              localVideo.srcObject = stream;
+              localVideoTrack = stream.getVideoTracks()[0] || null;
+              localAudioTrack = stream.getAudioTracks()[0] || null;
+              updateTrackStatus();
+              updateStatus("本地媒体流已设置");
+            } else {
+              // 远程流
+              remoteVideo.srcObject = stream;
+              updateStatus("远程媒体流已设置");
+            }
+          });
+
+          // 监听错误
+          client.on("error", (error) => {
+            updateStatus(`错误: ${error.message}`);
+            console.error("WebRTC 错误:", error);
+          });
+
+          updateStatus("客户端已创建，等待连接...");
+        } catch (error) {
+          updateStatus(`连接失败: ${error.message}`);
+          console.error("连接错误:", error);
+        }
+      });
+
+      /**
+       * 加入房间按钮事件
+       */
+      joinRoomBtn.addEventListener("click", async () => {
+        try {
+          const roomId = roomIdInput.value;
+          let userId = userIdInput.value;
+
+          // 如果用户ID为空，生成一个随机ID
+          if (!userId || userId === "user-") {
+            userId = `user-${Math.random().toString(36).substr(2, 9)}`;
+            userIdInput.value = userId;
+          }
+
+          updateStatus(`正在加入房间 ${roomId}...`);
+
+          // 获取摄像头和麦克风
+          currentStream = await client.getUserMedia({
+            video: true,
+            audio: true,
+          });
+          localVideo.srcObject = currentStream;
+          localVideoTrack = currentStream.getVideoTracks()[0] || null;
+          localAudioTrack = currentStream.getAudioTracks()[0] || null;
+          updateTrackStatus();
+          currentModeSpan.textContent = "摄像头";
+          isScreenSharing = false;
+
+          // 加入房间
+          await client.joinRoom(roomId, userId);
+          updateStatus(`已加入房间 ${roomId}，用户ID: ${userId}`);
+          updateButtons(true, true);
+        } catch (error) {
+          updateStatus(`加入房间失败: ${error.message}`);
+          console.error("加入房间错误:", error);
+        }
+      });
+
+      /**
+       * 开始屏幕共享按钮事件
+       */
+      startScreenShareBtn.addEventListener("click", async () => {
+        try {
+          updateStatus("正在获取屏幕共享权限...");
+
+          // 获取屏幕共享流
+          const screenStream = await client.getDisplayMedia({
+            video: {
+              cursor: "always", // 显示鼠标光标
+              displaySurface: "monitor", // 共享整个屏幕
+            },
+            audio: true, // 同时共享系统音频（如果浏览器支持）
+          });
+
+          // 停止旧的流
+          stopCurrentStream();
+
+          // 设置新的屏幕共享流
+          currentStream = screenStream;
+          localVideo.srcObject = currentStream;
+          localVideoTrack = currentStream.getVideoTracks()[0] || null;
+          localAudioTrack = currentStream.getAudioTracks()[0] || null;
+          updateTrackStatus();
+          currentModeSpan.textContent = "屏幕共享";
+          isScreenSharing = true;
+
+          // 监听屏幕共享停止事件（用户点击浏览器停止按钮）
+          if (localVideoTrack) {
+            localVideoTrack.onended = () => {
+              updateStatus("屏幕共享已停止");
+              stopCurrentStream();
+              currentModeSpan.textContent = "未设置";
+              isScreenSharing = false;
+              updateButtons(true, true);
+
+              // 自动切换回摄像头
+              switchToCamera();
+            };
+          }
+
+          updateStatus("屏幕共享已开始");
+          updateButtons(true, true);
+        } catch (error) {
+          updateStatus(`开始屏幕共享失败: ${error.message}`);
+          console.error("屏幕共享错误:", error);
+        }
+      });
+
+      /**
+       * 停止屏幕共享按钮事件
+       */
+      stopScreenShareBtn.addEventListener("click", () => {
         stopCurrentStream();
-
-        // 设置新的摄像头流
-        currentStream = cameraStream;
-        localVideo.srcObject = currentStream;
-        localVideoTrack = currentStream.getVideoTracks()[0] || null;
-        localAudioTrack = currentStream.getAudioTracks()[0] || null;
-        updateTrackStatus();
-        currentModeSpan.textContent = "摄像头";
-        isScreenSharing = false;
-
-        updateStatus("已切换到摄像头");
-        updateButtons(true, true);
-      } catch (error) {
-        updateStatus(`切换到摄像头失败: ${error.message}`);
-        console.error("切换摄像头错误:", error);
-      }
-    }
-
-    /**
-     * 切换到摄像头按钮事件
-     */
-    switchToCameraBtn.addEventListener("click", switchToCamera);
-
-    /**
-     * 切换本地视频开关
-     */
-    toggleLocalVideoBtn.addEventListener("click", () => {
-      if (localVideoTrack) {
-        localVideoTrack.enabled = !localVideoTrack.enabled;
-        toggleLocalVideoBtn.textContent = localVideoTrack.enabled ? "关闭视频" : "开启视频";
-        updateTrackStatus();
-      }
-    });
-
-    /**
-     * 切换本地音频开关
-     */
-    toggleLocalAudioBtn.addEventListener("click", () => {
-      if (localAudioTrack) {
-        localAudioTrack.enabled = !localAudioTrack.enabled;
-        toggleLocalAudioBtn.textContent = localAudioTrack.enabled ? "关闭音频" : "开启音频";
-        updateTrackStatus();
-      }
-    });
-
-    /**
-     * 离开房间按钮事件
-     */
-    leaveRoomBtn.addEventListener("click", async () => {
-      try {
-        stopCurrentStream();
-        await client.leaveRoom();
-        updateStatus("已离开房间");
         currentModeSpan.textContent = "未设置";
         isScreenSharing = false;
-        updateButtons(true, false);
-      } catch (error) {
-        updateStatus(`离开房间失败: ${error.message}`);
-        console.error("离开房间错误:", error);
-      }
-    });
+        updateStatus("屏幕共享已停止");
+        updateButtons(true, true);
+      });
 
-    /**
-     * 断开连接按钮事件
-     */
-    disconnectBtn.addEventListener("click", async () => {
-      try {
-        stopCurrentStream();
-        await client.disconnect();
-        updateStatus("已断开连接");
-        currentModeSpan.textContent = "未设置";
-        isScreenSharing = false;
-        updateButtons(false, false);
-        remoteVideo.srcObject = null;
-        client = null;
-      } catch (error) {
-        updateStatus(`断开连接失败: ${error.message}`);
-        console.error("断开连接错误:", error);
-      }
-    });
+      /**
+       * 切换到摄像头
+       */
+      async function switchToCamera() {
+        try {
+          updateStatus("正在切换到摄像头...");
 
-    // 初始化按钮状态
-    updateButtons(false, false);
-  </script>
-</body>
+          // 获取摄像头和麦克风
+          const cameraStream = await client.getUserMedia({
+            video: true,
+            audio: true,
+          });
+
+          // 停止旧的流
+          stopCurrentStream();
+
+          // 设置新的摄像头流
+          currentStream = cameraStream;
+          localVideo.srcObject = currentStream;
+          localVideoTrack = currentStream.getVideoTracks()[0] || null;
+          localAudioTrack = currentStream.getAudioTracks()[0] || null;
+          updateTrackStatus();
+          currentModeSpan.textContent = "摄像头";
+          isScreenSharing = false;
+
+          updateStatus("已切换到摄像头");
+          updateButtons(true, true);
+        } catch (error) {
+          updateStatus(`切换到摄像头失败: ${error.message}`);
+          console.error("切换摄像头错误:", error);
+        }
+      }
+
+      /**
+       * 切换到摄像头按钮事件
+       */
+      switchToCameraBtn.addEventListener("click", switchToCamera);
+
+      /**
+       * 切换本地视频开关
+       */
+      toggleLocalVideoBtn.addEventListener("click", () => {
+        if (localVideoTrack) {
+          localVideoTrack.enabled = !localVideoTrack.enabled;
+          toggleLocalVideoBtn.textContent = localVideoTrack.enabled
+            ? "关闭视频"
+            : "开启视频";
+          updateTrackStatus();
+        }
+      });
+
+      /**
+       * 切换本地音频开关
+       */
+      toggleLocalAudioBtn.addEventListener("click", () => {
+        if (localAudioTrack) {
+          localAudioTrack.enabled = !localAudioTrack.enabled;
+          toggleLocalAudioBtn.textContent = localAudioTrack.enabled
+            ? "关闭音频"
+            : "开启音频";
+          updateTrackStatus();
+        }
+      });
+
+      /**
+       * 离开房间按钮事件
+       */
+      leaveRoomBtn.addEventListener("click", async () => {
+        try {
+          stopCurrentStream();
+          await client.leaveRoom();
+          updateStatus("已离开房间");
+          currentModeSpan.textContent = "未设置";
+          isScreenSharing = false;
+          updateButtons(true, false);
+        } catch (error) {
+          updateStatus(`离开房间失败: ${error.message}`);
+          console.error("离开房间错误:", error);
+        }
+      });
+
+      /**
+       * 断开连接按钮事件
+       */
+      disconnectBtn.addEventListener("click", async () => {
+        try {
+          stopCurrentStream();
+          await client.disconnect();
+          updateStatus("已断开连接");
+          currentModeSpan.textContent = "未设置";
+          isScreenSharing = false;
+          updateButtons(false, false);
+          remoteVideo.srcObject = null;
+          client = null;
+        } catch (error) {
+          updateStatus(`断开连接失败: ${error.message}`);
+          console.error("断开连接错误:", error);
+        }
+      });
+
+      // 初始化按钮状态
+      updateButtons(false, false);
+    </script>
+  </body>
 </html>

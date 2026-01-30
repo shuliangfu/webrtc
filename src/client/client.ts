@@ -353,7 +353,8 @@ export class RTCClient {
    */
   connect(): void {
     // 环境不具备 WebRTC 时立即失败，避免后续 joinRoom 等调用挂起（如 Bun/Node 无 RTCPeerConnection）
-    const hasRTC = typeof (globalThis as { RTCPeerConnection?: unknown }).RTCPeerConnection !==
+    const hasRTC = typeof (globalThis as { RTCPeerConnection?: unknown })
+      .RTCPeerConnection !==
       "undefined";
     if (!hasRTC) {
       this.setConnectionState("failed");
