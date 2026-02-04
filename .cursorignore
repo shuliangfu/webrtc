@@ -42,8 +42,6 @@ pnpm-debug.log*
 .env.test
 
 # IDE 和编辑器
-.vscode/
-.cursor/
 .idea/
 *.swp
 *.swo
