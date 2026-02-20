@@ -17,6 +17,9 @@ import {
   waitForPortRelease,
   waitForServerReady,
 } from "./test-utils.ts";
+import { setWebrtcLocale } from "../src/i18n.ts";
+
+setWebrtcLocale("zh-CN");
 
 describe("SignalingServer", () => {
   let server: SignalingServer;
@@ -217,9 +220,8 @@ describe("WebRTCManager", () => {
 
   it("应该在未注册配置时抛出错误", () => {
     const manager = new WebRTCManager();
-    // 错误信息随 locale 中英文不同，兼容两种文案
     expect(() => manager.getServer("unknown")).toThrow(
-      /(未找到名为 "unknown" 的信令服务器配置|Signaling server config not found for name "unknown")/,
+      '未找到名为 "unknown" 的信令服务器配置',
     );
   });
 
