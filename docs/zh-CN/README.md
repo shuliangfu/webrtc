@@ -622,6 +622,13 @@ await server.listen();
 
 ---
 
+## 变更日志
+
+- **[1.0.0]** (2026-02-20) — 首个稳定版。信令服务端、WebRTC
+  客户端、房间管理、连接池、质量自适应等。详见 [CHANGELOG.md](./CHANGELOG.md)。
+
+---
+
 ## 🤝 贡献
 
 欢迎提交 Issue 和 Pull Request！

@@ -613,6 +613,14 @@ await server.listen();
 
 ---
 
+## Changelog
+
+- **[1.0.0]** (2026-02-20) — Initial stable release. Signaling server, WebRTC
+  client, room management, connection pool, quality adaptation. See
+  [CHANGELOG.md](./docs/en-US/CHANGELOG.md).
+
+---
+
 ## Contributing
 
 Issues and Pull Requests are welcome.
