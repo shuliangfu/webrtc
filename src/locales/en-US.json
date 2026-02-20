@@ -1,0 +1,7 @@
+{
+  "webrtc": {
+    "server": {
+      "signalingConfigNotFound": "Signaling server config not found for name \"{name}\""
+    }
+  }
+}

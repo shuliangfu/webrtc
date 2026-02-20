@@ -6,8 +6,10 @@
  */
 
 import { createLogger } from "@dreamer/logger";
+import type { ServiceContainer } from "@dreamer/service";
 import type { SocketIOSocket } from "@dreamer/socket-io";
 import { Server as SocketIOServer } from "@dreamer/socket-io";
+import { $tr } from "../i18n.ts";
 import type {
   ICEServer,
   RoomInfo,
@@ -15,7 +17,6 @@ import type {
   SignalingServerOptions,
   UserInfo,
 } from "../types.ts";
-import type { ServiceContainer } from "@dreamer/service";
 
 /**
  * WebRTC 信令服务器
@@ -132,13 +133,11 @@ export class SignalingServer {
     this.io.on("connection", (socket: SocketIOSocket) => {
       this.logger.info(`[SignalingServer] 新连接: ${socket.id}`);
 
-      // 处理加入房间
-      socket.on(
-        "join-room",
-        (data: { roomId: string; userId?: string }) => {
-          this.handleJoinRoom(socket, data.roomId, data.userId);
-        },
-      );
+      // 处理加入房间（SocketEventListener 为 (data?: unknown) => void，回调内断言类型）
+      socket.on("join-room", (data?: unknown) => {
+        const d = (data ?? {}) as { roomId?: string; userId?: string };
+        this.handleJoinRoom(socket, d.roomId ?? "", d.userId);
+      });
 
       // 处理离开房间
       socket.on("leave-room", () => {
@@ -146,13 +145,13 @@ export class SignalingServer {
       });
 
       // 处理信令消息（offer、answer、ice-candidate）
-      socket.on("signaling", (message: SignalingMessage) => {
-        this.handleSignaling(socket, message);
+      socket.on("signaling", (data?: unknown) => {
+        this.handleSignaling(socket, data as SignalingMessage);
       });
 
       // 处理断开连接
-      socket.on("disconnect", (reason: string) => {
-        this.handleDisconnect(socket, reason);
+      socket.on("disconnect", (reason?: unknown) => {
+        this.handleDisconnect(socket, String(reason ?? ""));
       });
 
       // 发送 ICE 服务器配置
@@ -848,7 +847,7 @@ export class WebRTCManager {
     if (!server) {
       const config = this.configs.get(name) || this.defaultConfig;
       if (!config) {
-        throw new Error(`未找到名为 "${name}" 的信令服务器配置`);
+        throw new Error($tr("webrtc.server.signalingConfigNotFound", { name }));
       }
       server = new SignalingServer(config);
       this.servers.set(name, server);

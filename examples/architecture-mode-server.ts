@@ -26,25 +26,8 @@ const server = new SignalingServer({
   // ],
 });
 
-// 监听连接事件
-server.on("connection", (socket) => {
-  console.log(`客户端连接: ${socket.id}`);
-});
-
-// 监听断开事件
-server.on("disconnect", (socket) => {
-  console.log(`客户端断开: ${socket.id}`);
-});
-
-// 监听房间事件
-server.on("room-joined", (data) => {
-  console.log(`用户 ${data.userId} 加入房间 ${data.roomId}`);
-});
-
-server.on("room-left", (data) => {
-  console.log(`用户 ${data.userId} 离开房间 ${data.roomId}`);
-});
-
+// 注意：SignalingServer 当前未暴露 connection / disconnect / room-joined / room-left 等事件 API，
+// 若需监听可在后续版本通过 options 或扩展类实现。此处仅启动服务器。
 // 启动服务器
 await server.listen();
 console.log("WebRTC 架构模式示例服务器运行在 http://localhost:3000");

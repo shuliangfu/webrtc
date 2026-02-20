@@ -1,0 +1,7 @@
+{
+  "webrtc": {
+    "server": {
+      "signalingConfigNotFound": "未找到名为 \"{name}\" 的信令服务器配置"
+    }
+  }
+}

@@ -34,6 +34,9 @@ import {
   RTCSessionDescription as RTCSessionDescriptionConstructor,
 } from "./types.ts";
 
+/** 与 @dreamer/socket-io 的 on() 兼容：库要求 listener 为 (data: unknown) => void，此处用具类型回调再整体断言以保持业务侧类型清晰 */
+type SocketOnListener = (data: unknown) => void;
+
 /**
  * WebRTC 客户端
  * 用于浏览器端建立 WebRTC 音视频通话连接
@@ -220,83 +223,83 @@ export class RTCClient {
       this.setConnectionState("connected");
     });
 
-    // 接收 ICE 服务器配置
-    this.socket.on(
-      "ice-servers",
-      (data: { stunServers: ICEServer[]; turnServers: ICEServer[] }) => {
-        this.iceServers = [...data.stunServers, ...data.turnServers];
-        this.updateRTCConfiguration();
-      },
-    );
+    // 接收 ICE 服务器配置（ClientEventListener 为 (data?: unknown) => void，回调内断言类型）
+    this.socket.on("ice-servers", (data?: unknown) => {
+      const d = data as { stunServers: ICEServer[]; turnServers: ICEServer[] };
+      if (!d?.stunServers) return;
+      this.iceServers = [...d.stunServers, ...(d.turnServers ?? [])];
+      this.updateRTCConfiguration();
+    });
 
     // 接收信令消息
-    this.socket.on("signaling", async (message: SignalingMessage) => {
+    this.socket.on("signaling", async (data?: unknown) => {
+      const message = data as SignalingMessage | undefined;
+      if (!message) return;
       await this.handleSignaling(message);
     });
 
     // 用户加入房间
-    this.socket.on(
-      "user-joined",
-      (data: { userId: string; roomId: string }) => {
-        logger.info(`用户 ${data.userId} 加入房间 ${data.roomId}`);
-        // 如果是新用户加入，且我们已经创建了 PeerConnection，需要创建 offer
-        if (
-          this.peerConnection && this.peerConnection.signalingState === "stable"
-        ) {
-          this.createOffer();
-        }
-      },
-    );
+    this.socket.on("user-joined", (data?: unknown) => {
+      const d = data as { userId: string; roomId: string } | undefined;
+      if (!d) return;
+      logger.info(`用户 ${d.userId} 加入房间 ${d.roomId}`);
+      // 如果是新用户加入，且我们已经创建了 PeerConnection，需要创建 offer
+      if (
+        this.peerConnection && this.peerConnection.signalingState === "stable"
+      ) {
+        this.createOffer();
+      }
+    });
 
     // 用户离开房间
-    this.socket.on("user-left", (data: { userId: string; roomId: string }) => {
-      logger.info(`用户 ${data.userId} 离开房间 ${data.roomId}`);
+    this.socket.on("user-left", (data?: unknown) => {
+      const d = data as { userId: string; roomId: string } | undefined;
+      if (!d) return;
+      logger.info(`用户 ${d.userId} 离开房间 ${d.roomId}`);
 
       // 如果是多人房间模式，清理对应的 PeerConnection
       if (this.multiPeerMode) {
-        this.removePeerConnectionForUser(data.userId);
+        this.removePeerConnectionForUser(d.userId);
       }
     });
 
     // 房间加入成功
-    this.socket.on(
-      "room-joined",
-      (data: { roomId: string; userId: string; users: string[] }) => {
-        logger.info(
-          `加入房间成功: ${data.roomId}, 房间内用户: ${data.users.length}`,
-        );
-        this.roomId = data.roomId;
-        this.userId = data.userId;
-        this.roomUserCount = data.users.length + 1; // 包括自己
+    this.socket.on("room-joined", (data?: unknown) => {
+      const d = data as
+        | { roomId: string; userId: string; users: string[] }
+        | undefined;
+      if (!d) return;
+      logger.info(
+        `加入房间成功: ${d.roomId}, 房间内用户: ${d.users.length}`,
+      );
+      this.roomId = d.roomId;
+      this.userId = d.userId;
+      this.roomUserCount = d.users.length + 1; // 包括自己
 
-        // 检查是否需要切换架构模式
-        if (this.options.architectureMode === "auto") {
-          this.checkAndSwitchArchitecture();
-        }
+      // 检查是否需要切换架构模式
+      if (this.options.architectureMode === "auto") {
+        this.checkAndSwitchArchitecture();
+      }
 
-        // 如果是多人房间模式，为房间内其他用户创建 PeerConnection
-        if (this.multiPeerMode && this.currentArchitectureMode === "mesh") {
-          for (const otherUserId of data.users) {
-            this.createPeerConnectionForUser(otherUserId);
-          }
+      // 如果是多人房间模式，为房间内其他用户创建 PeerConnection
+      if (this.multiPeerMode && this.currentArchitectureMode === "mesh") {
+        for (const otherUserId of d.users) {
+          this.createPeerConnectionForUser(otherUserId);
         }
-      },
-    );
+      }
+    });
 
     // 用户加入房间（更新房间人数）
-    this.socket.on(
-      "user-joined",
-      (_data: { userId: string; roomId: string }) => {
-        this.roomUserCount++;
-        // 检查是否需要切换架构模式
-        if (this.options.architectureMode === "auto") {
-          this.checkAndSwitchArchitecture();
-        }
-      },
-    );
+    this.socket.on("user-joined", (_data?: unknown) => {
+      this.roomUserCount++;
+      // 检查是否需要切换架构模式
+      if (this.options.architectureMode === "auto") {
+        this.checkAndSwitchArchitecture();
+      }
+    });
 
     // 用户离开房间（更新房间人数）
-    this.socket.on("user-left", (_data: { userId: string; roomId: string }) => {
+    this.socket.on("user-left", (_data?: unknown) => {
       this.roomUserCount = Math.max(0, this.roomUserCount - 1);
       // 检查是否需要切换架构模式
       if (this.options.architectureMode === "auto") {
@@ -305,27 +308,30 @@ export class RTCClient {
     });
 
     // 接收架构模式切换通知
-    this.socket.on(
-      "architecture-mode",
-      (data: { architectureMode: ArchitectureMode }) => {
-        if (data.architectureMode !== this.currentArchitectureMode) {
-          this.switchArchitecture(data.architectureMode);
-        }
-      },
-    );
+    this.socket.on("architecture-mode", (data?: unknown) => {
+      const d = data as { architectureMode: ArchitectureMode } | undefined;
+      if (!d) return;
+      if (d.architectureMode !== this.currentArchitectureMode) {
+        this.switchArchitecture(d.architectureMode);
+      }
+    });
 
     // 连接断开
-    this.socket.on("disconnect", (reason: string) => {
-      logger.info(`信令服务器断开: ${reason}`);
+    this.socket.on("disconnect", (reason?: unknown) => {
+      logger.info(`信令服务器断开: ${String(reason ?? "")}`);
       this.setConnectionState("disconnected");
       this.stats.reconnections++;
     });
 
     // 连接错误
-    this.socket.on("error", (error: Error) => {
+    this.socket.on("error", (error?: unknown) => {
       this.stats.errors++;
-      logger.error("信令服务器错误", undefined, error);
-      this.emit("error", error);
+      logger.error(
+        "信令服务器错误",
+        undefined,
+        (error ?? new Error("unknown")) as Error,
+      );
+      this.emit("error", (error ?? new Error("unknown")) as Error);
     });
   }
 

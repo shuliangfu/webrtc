@@ -8,7 +8,14 @@
  */
 
 import { RUNTIME } from "@dreamer/runtime-adapter";
-import { afterAll, beforeAll, describe, expect, it } from "@dreamer/test";
+import {
+  afterAll,
+  beforeAll,
+  cleanupAllBrowsers,
+  describe,
+  expect,
+  it,
+} from "@dreamer/test";
 import { SignalingServer } from "../src/server/mod.ts";
 import {
   delay,
@@ -32,6 +39,7 @@ const browserConfig = {
   // 启用浏览器测试
   browser: {
     enabled: true,
+    browserSource: "test" as const,
     // 客户端源码入口；browserMode: false 时会把 @dreamer/socket-io 等打进 bundle
     entryPoint: "./src/client/mod.ts",
     // 全局变量名
@@ -42,15 +50,6 @@ const browserConfig = {
     moduleLoadTimeout: 90_000,
     // 无头模式
     headless: true,
-    // Chrome 启动参数（支持 WebRTC 测试）
-    args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-dev-shm-usage",
-      "--disable-gpu",
-      "--use-fake-ui-for-media-stream",
-      "--use-fake-device-for-media-stream",
-    ],
     // 复用浏览器实例
     reuseBrowser: true,
     // 自定义 body 内容
@@ -90,6 +89,7 @@ describe(`WebRTC - 浏览器测试 (${RUNTIME})`, () => {
       server = null;
       console.log(`[${RUNTIME}] 信令服务器已关闭`);
     }
+    await cleanupAllBrowsers();
   });
 
   describe("RTCClient 浏览器环境测试", () => {
