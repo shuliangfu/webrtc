@@ -8,7 +8,7 @@
 
 [![JSR](https://jsr.io/badges/@dreamer/webrtc)](https://jsr.io/@dreamer/webrtc)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](../../LICENSE)
-[![Tests](https://img.shields.io/badge/tests-182%20passed-brightgreen)](./TEST_REPORT.md)
+[![Tests](https://img.shields.io/badge/tests-194%20passed-brightgreen)](./TEST_REPORT.md)
 
 ---
 

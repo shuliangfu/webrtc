@@ -163,11 +163,12 @@ export class RTCClient {
       maxSize: this.options.connectionPoolSize || 5,
     });
 
-    // 创建 Socket.IO 客户端
+    // 创建 Socket.IO 客户端（始终传 autoConnect: false，由本类在下方按 options.autoConnect 单独调用 connect，
+    // 避免 Socket.IO 构造时与后续 connect() 并发导致 this.transport 被覆盖，在 Bun 下出现 transport 为 null）
     // Socket.IO 客户端会自动在 URL 后添加 /socket.io/，所以服务器也需要使用 /socket.io/ 路径
     this.socket = new SocketIOClient({
       url: this.options.signalingUrl,
-      autoConnect: this.options.autoConnect, // 传递 autoConnect 选项，确保 Socket.IO 客户端不会自动连接
+      autoConnect: false,
       autoReconnect: this.options.reconnect,
       reconnectionDelay: this.options.reconnectInterval,
       reconnectionDelayMax: this.options.reconnectInterval * 5,
@@ -192,9 +193,15 @@ export class RTCClient {
     // 设置信令处理器
     this.setupSignalingHandlers();
 
-    // 自动连接
+    // 自动连接（Bun 等环境下 connect() 可能抛错，外层捕获确保状态为 failed）
     if (this.options.autoConnect) {
-      this.connect();
+      try {
+        this.connect();
+      } catch (err) {
+        logger.error("自动连接失败:", err as Error);
+        this.stats.errors++;
+        this.setConnectionState("failed");
+      }
     }
   }
 
@@ -323,7 +330,7 @@ export class RTCClient {
       this.stats.reconnections++;
     });
 
-    // 连接错误
+    // 连接错误：若尚未 connected 则置为 failed，便于调用方/测试结束等待（含 Bun 下异步失败）
     this.socket.on("error", (error?: unknown) => {
       this.stats.errors++;
       logger.error(
@@ -332,6 +339,16 @@ export class RTCClient {
         (error ?? new Error("unknown")) as Error,
       );
       this.emit("error", (error ?? new Error("unknown")) as Error);
+      if (
+        this.connectionState !== "connected" &&
+        this.connectionState !== "closed"
+      ) {
+        if (this.connectTimeoutId != null) {
+          clearTimeout(this.connectTimeoutId);
+          this.connectTimeoutId = undefined;
+        }
+        this.setConnectionState("failed");
+      }
     });
   }
 
@@ -367,7 +384,30 @@ export class RTCClient {
       return;
     }
 
-    this.socket.connect();
+    /** 将连接失败统一置为 failed 并清理超时（同步抛错或 Promise rejection 均会进入）；须用箭头函数保留 this */
+    const onConnectFailed = (err: unknown): void => {
+      logger.error("连接失败:", err as Error);
+      this.stats.errors++;
+      if (this.connectTimeoutId != null) {
+        clearTimeout(this.connectTimeoutId);
+        this.connectTimeoutId = undefined;
+      }
+      this.setConnectionState("failed");
+    };
+
+    try {
+      const connectResult = this.socket.connect();
+      // Socket.IO 的 connect() 为 async，Bun 下异常可能在 await 后抛出，需处理 Promise rejection
+      if (
+        connectResult &&
+        typeof (connectResult as Promise<unknown>).catch === "function"
+      ) {
+        (connectResult as Promise<void>).catch(onConnectFailed.bind(this));
+      }
+    } catch (err) {
+      onConnectFailed(err);
+      return;
+    }
 
     // 信令连接超时：若在约定时间内未触发 "connect"，则置为 failed 并断开，避免无限挂起
     if (this.connectTimeoutId != null) {

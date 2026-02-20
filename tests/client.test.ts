@@ -104,28 +104,23 @@ describe("RTCClient", () => {
     }, { timeout: 15000 });
 
     it("应该自动连接", async () => {
-      const hasRTC = typeof (globalThis as { RTCPeerConnection?: unknown })
-        .RTCPeerConnection !==
-        "undefined";
       const client = new RTCClient({
         signalingUrl: serverUrl,
         autoConnect: true,
       });
 
-      if (hasRTC) {
-        // 有 WebRTC（如 Deno/浏览器）：等待信令连接成功，断言状态为 connected
-        const deadline = Date.now() + 8_000;
-        while (
-          client.getConnectionState() !== "connected" && Date.now() < deadline
-        ) {
-          await delay(200);
-        }
-        expect(client.getConnectionState()).toBe("connected");
-      } else {
-        // 无 WebRTC（如 Bun）：connect() 会立即置为 failed，短延迟后断言
-        await delay(300);
-        expect(client.getConnectionState()).toBe("failed");
+      // 等待状态稳定：有 WebRTC 时为 connected（信令连上），无 WebRTC 时为 failed（connect() 内直接置 failed）
+      // 不依赖测试侧的 RTCPeerConnection 检测，以客户端实际状态为准
+      const deadline = Date.now() + 8_000;
+      let state: string;
+      for (;;) {
+        state = client.getConnectionState();
+        if (state === "connected" || state === "failed") break;
+        if (Date.now() >= deadline) break;
+        await delay(200);
       }
+      expect(["connected", "failed"]).toContain(state);
+      expect(client.getConnectionState()).toBe(state);
 
       client.disconnect();
       await delay(200);

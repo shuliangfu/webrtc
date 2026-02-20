@@ -2,10 +2,10 @@
 
 ## 测试概览
 
-- **测试包版本**: @dreamer/webrtc@1.0.0-beta.4
-- **服务容器版本**: @dreamer/service@1.0.0-beta.4
+- **测试包版本**: @dreamer/webrtc@1.0.0
+- **服务容器版本**: @dreamer/service@1.0.2
 - **测试框架**: @dreamer/test (兼容 Deno 和 Bun)
-- **测试时间**: 2026-01-30
+- **测试时间**: 2026-02-20
 - **测试环境**:
   - Deno 2.6+
   - Bun 1.3.5
@@ -14,33 +14,33 @@
 
 ### 总体统计
 
-- **总测试数**: 182
-- **通过**: 182 ✅
+- **总测试数**: 194
+- **通过**: 194 ✅
 - **失败**: 0
 - **通过率**: 100% ✅
-- **测试执行时间**: 2m37s
+- **测试执行时间**: 2m10s
 
 ### 测试文件统计
 
 | 测试文件                       | 测试数 | 状态        | 说明                                                        |
 | ------------------------------ | ------ | ----------- | ----------------------------------------------------------- |
 | `architecture-mode.test.ts`    | 10     | ✅ 全部通过 | 架构模式测试（Mesh/SFU/Auto）                               |
-| `browser-puppeteer.test.ts`    | 23     | ✅ 全部通过 | 浏览器端 Puppeteer 测试（含架构模式测试）                   |
-| `client-comprehensive.test.ts` | 15     | ✅ 全部通过 | RTCClient 全面测试（质量自适应、事件系统、状态管理等）      |
-| `client-methods.test.ts`       | 17     | ✅ 全部通过 | RTCClient 方法测试                                          |
-| `client.test.ts`               | 18     | ✅ 全部通过 | RTCClient 基础功能测试                                      |
-| `edge-cases.test.ts`           | 11     | ✅ 全部通过 | 边界情况和错误处理测试                                      |
-| `hooks-execution.test.ts`      | 27     | ✅ 全部通过 | 钩子函数执行测试（beforeAll/afterAll/beforeEach/afterEach） |
-| `integration.test.ts`          | 7      | ✅ 全部通过 | 客户端和服务端集成测试                                      |
-| `server-comprehensive.test.ts` | 11     | ✅ 全部通过 | SignalingServer 全面测试                                    |
-| `server-methods.test.ts`       | 9      | ✅ 全部通过 | SignalingServer 方法测试                                    |
-| `server.test.ts`               | 35     | ✅ 全部通过 | SignalingServer + WebRTCManager + ServiceContainer 集成测试 |
+| `browser-playwright.test.ts`   | 23     | ✅ 全部通过 | 浏览器端 Playwright 测试（含架构模式测试）                  |
+| `client-comprehensive.test.ts` | 18     | ✅ 全部通过 | RTCClient 全面测试（质量自适应、事件系统、状态管理等）      |
+| `client-methods.test.ts`       | 18     | ✅ 全部通过 | RTCClient 方法测试                                          |
+| `client.test.ts`               | 19     | ✅ 全部通过 | RTCClient 基础功能测试                                      |
+| `edge-cases.test.ts`           | 12     | ✅ 全部通过 | 边界情况和错误处理测试                                      |
+| `hooks-execution.test.ts`      | 28     | ✅ 全部通过 | 钩子函数执行测试（beforeAll/afterAll/beforeEach/afterEach） |
+| `integration.test.ts`          | 8      | ✅ 全部通过 | 客户端和服务端集成测试                                      |
+| `server-comprehensive.test.ts` | 12     | ✅ 全部通过 | SignalingServer 全面测试                                    |
+| `server-methods.test.ts`       | 10     | ✅ 全部通过 | SignalingServer 方法测试                                    |
+| `server.test.ts`               | 36     | ✅ 全部通过 | SignalingServer + WebRTCManager + ServiceContainer 集成测试 |
 
-_注：上表测试数合计 182，与本次运行「182 passed」一致。_
+_注：上表测试数合计 194，与本次运行「194 passed」一致。_
 
 ## 功能测试详情
 
-### 1. RTCClient 基础功能测试 (client.test.ts) - 18 个测试
+### 1. RTCClient 基础功能测试 (client.test.ts) - 19 个测试
 
 **测试场景**:
 
@@ -63,7 +63,7 @@ _注：上表测试数合计 182，与本次运行「182 passed」一致。_
 - ✅ 应该支持事件移除
 - ✅ 应该支持清理资源
 
-**测试结果**: 18 个测试全部通过
+**测试结果**: 19 个测试全部通过
 
 **实现特点**:
 
@@ -72,7 +72,7 @@ _注：上表测试数合计 182，与本次运行「182 passed」一致。_
 - ✅ 自动处理连接建立和协商
 - ✅ 支持音视频流和数据通道
 
-### 2. RTCClient 方法测试 (client-methods.test.ts) - 17 个测试
+### 2. RTCClient 方法测试 (client-methods.test.ts) - 18 个测试
 
 **测试场景**:
 
@@ -94,7 +94,7 @@ _注：上表测试数合计 182，与本次运行「182 passed」一致。_
 - ✅ 应该支持静音/取消静音
 - ✅ 应该支持暂停/恢复视频
 
-**测试结果**: 17 个测试全部通过
+**测试结果**: 18 个测试全部通过
 
 **实现特点**:
 
@@ -103,7 +103,7 @@ _注：上表测试数合计 182，与本次运行「182 passed」一致。_
 - ✅ 数据通道功能
 - ✅ 音视频质量控制
 
-### 3. RTCClient 全面测试 (client-comprehensive.test.ts) - 15 个测试
+### 3. RTCClient 全面测试 (client-comprehensive.test.ts) - 18 个测试
 
 **测试场景**:
 
@@ -123,7 +123,7 @@ _注：上表测试数合计 182，与本次运行「182 passed」一致。_
 - ✅ 应该处理连接超时
 - ✅ 应该处理心跳机制
 
-**测试结果**: 15 个测试全部通过
+**测试结果**: 18 个测试全部通过
 
 **实现特点**:
 
@@ -132,7 +132,7 @@ _注：上表测试数合计 182，与本次运行「182 passed」一致。_
 - ✅ 健壮的错误处理
 - ✅ 资源管理优化
 
-### 4. SignalingServer + WebRTCManager 测试 (server.test.ts) - 35 个测试
+### 4. SignalingServer + WebRTCManager 测试 (server.test.ts) - 36 个测试
 
 **测试场景**:
 
@@ -165,7 +165,7 @@ _注：上表测试数合计 182，与本次运行「182 passed」一致。_
 - ✅ ServiceContainer 集成（设置/获取容器、fromContainer）
 - ✅ createWebRTCManager 工厂函数测试
 
-**测试结果**: 35 个测试全部通过
+**测试结果**: 36 个测试全部通过
 
 **实现特点**:
 
@@ -176,7 +176,7 @@ _注：上表测试数合计 182，与本次运行「182 passed」一致。_
 - ✅ WebRTCManager 管理多个服务器实例
 - ✅ ServiceContainer 集成支持
 
-### 5. SignalingServer 方法测试 (server-methods.test.ts) - 9 个测试
+### 5. SignalingServer 方法测试 (server-methods.test.ts) - 10 个测试
 
 **测试场景**:
 
@@ -190,7 +190,7 @@ _注：上表测试数合计 182，与本次运行「182 passed」一致。_
 - ✅ 应该支持关闭房间
 - ✅ 应该支持获取连接数
 
-**测试结果**: 9 个测试全部通过
+**测试结果**: 10 个测试全部通过
 
 **实现特点**:
 
@@ -199,7 +199,7 @@ _注：上表测试数合计 182，与本次运行「182 passed」一致。_
 - ✅ 消息广播功能
 - ✅ 统计和监控功能
 
-### 6. SignalingServer 全面测试 (server-comprehensive.test.ts) - 11 个测试
+### 6. SignalingServer 全面测试 (server-comprehensive.test.ts) - 12 个测试
 
 **测试场景**:
 
@@ -215,7 +215,7 @@ _注：上表测试数合计 182，与本次运行「182 passed」一致。_
 - ✅ 应该处理内存管理
 - ✅ 应该处理连接限制
 
-**测试结果**: 11 个测试全部通过
+**测试结果**: 12 个测试全部通过
 
 **实现特点**:
 
@@ -224,7 +224,7 @@ _注：上表测试数合计 182，与本次运行「182 passed」一致。_
 - ✅ 性能优化机制
 - ✅ 健壮的错误处理
 
-### 7. WebRTC 集成测试 (integration.test.ts) - 7 个测试
+### 7. WebRTC 集成测试 (integration.test.ts) - 8 个测试
 
 **测试场景**:
 
@@ -236,7 +236,7 @@ _注：上表测试数合计 182，与本次运行「182 passed」一致。_
 - ✅ 应该完成错误恢复流程
 - ✅ 应该完成资源清理流程
 
-**测试结果**: 7 个测试全部通过
+**测试结果**: 8 个测试全部通过
 
 **实现特点**:
 
@@ -245,7 +245,7 @@ _注：上表测试数合计 182，与本次运行「182 passed」一致。_
 - ✅ 多人通话场景支持
 - ✅ 完整的错误处理
 
-### 8. 边界情况和错误处理测试 (edge-cases.test.ts) - 11 个测试
+### 8. 边界情况和错误处理测试 (edge-cases.test.ts) - 12 个测试
 
 **测试场景**:
 
@@ -261,7 +261,7 @@ _注：上表测试数合计 182，与本次运行「182 passed」一致。_
 - ✅ 应该处理资源耗尽
 - ✅ 应该处理并发冲突
 
-**测试结果**: 11 个测试全部通过
+**测试结果**: 12 个测试全部通过
 
 **实现特点**:
 
@@ -270,7 +270,7 @@ _注：上表测试数合计 182，与本次运行「182 passed」一致。_
 - ✅ 资源泄漏防护
 - ✅ 异常场景恢复
 
-### 钩子函数执行测试 (hooks-execution.test.ts) - 27 个测试
+### 钩子函数执行测试 (hooks-execution.test.ts) - 28 个测试
 
 **测试场景**:
 
@@ -283,7 +283,7 @@ _注：上表测试数合计 182，与本次运行「182 passed」一致。_
 - ✅ 嵌套套件的钩子执行顺序（父套件/子套件 afterAll）
 - ✅ beforeEach/afterEach 接收 TestContext
 
-**测试结果**: 27 个测试全部通过
+**测试结果**: 28 个测试全部通过
 
 **实现特点**:
 
@@ -352,7 +352,7 @@ _注：上表测试数合计 182，与本次运行「182 passed」一致。_
 7. ✅ **性能优化**：高并发场景的性能测试
 8. ✅ **跨运行时兼容**：Deno 和 Bun 环境都通过测试
 
-### 9. 浏览器端测试 (browser-puppeteer.test.ts) - 24 个测试
+### 9. 浏览器端测试 (browser-playwright.test.ts) - 24 个测试
 
 **测试场景**:
 
@@ -395,7 +395,7 @@ _注：上表测试数合计 182，与本次运行「182 passed」一致。_
 
 **实现特点**:
 
-- ✅ 使用 Puppeteer 在真实浏览器环境中测试
+- ✅ 使用 Playwright 在真实浏览器环境中测试
 - ✅ 验证浏览器 API 可用性（RTCPeerConnection、MediaStream）
 - ✅ 验证客户端在浏览器环境中的创建和初始化
 - ✅ 验证事件系统和状态管理功能
@@ -449,20 +449,19 @@ _注：上表测试数合计 182，与本次运行「182 passed」一致。_
 
 ## 结论
 
-@dreamer/webrtc 包经过全面测试，本次运行 **163 个测试全部通过**，测试覆盖率达到
+@dreamer/webrtc 包经过全面测试，本次运行 **194 个测试全部通过**，测试覆盖率达到
 100%。客户端和服务端的所有功能、边界情况、错误处理都有完整的测试覆盖。集成测试验证了端到端的完整流程，浏览器测试验证了在真实浏览器环境中的功能，包括
 RTCPeerConnection、MediaStream 等浏览器 API 的完整支持。架构模式测试验证了
 Mesh、SFU 和自动切换功能的正确性，支持小规模（< 10 人）使用 Mesh 架构，大规模（>
-10 人）自动切换到 SFU
-架构。新增的钩子函数执行测试（hooks-execution.test.ts）覆盖了
+10 人）自动切换到 SFU 架构。钩子函数执行测试（hooks-execution.test.ts）覆盖了
 beforeAll/afterAll/beforeEach/afterEach
 等生命周期的正确执行，可以放心用于生产环境。
 
-**测试总数**: 163\
-**执行时间**: 2m37s
+**测试总数**: 194\
+**执行时间**: 2m10s
 
 ---
 
-**报告生成时间**: 2026-01-27\
+**报告生成时间**: 2026-02-20\
 **测试框架版本**: @dreamer/test@1.0.0-beta.37\
 **运行时适配器版本**: @dreamer/runtime-adapter@1.0.0-beta.19

@@ -1,6 +1,6 @@
 /**
  * @fileoverview 使用 @dreamer/test 浏览器测试集成进行浏览器端测试
- * 使用新版测试库的浏览器测试功能，自动管理 Puppeteer 和 esbuild
+ * 使用新版测试库的浏览器测试功能，自动管理 Playwright 和 esbuild
  *
  * 说明：入口含 @dreamer/socket-io 等 JSR，须传 browserMode: false，
  * 让 @dreamer/test 把 JSR 打进 bundle，避免 IIFE+external 在浏览器里生成 require()。
